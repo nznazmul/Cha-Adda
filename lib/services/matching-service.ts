@@ -25,7 +25,7 @@ export async function fetchDiscoveryCandidates(
     return devStore.getDiscoveryCandidates(currentUserId);
   }
 
-  return (data || []).map((row: any) => ({
+  return ((data as PublicProfile[]) || []).map((row) => ({
     id: row.id,
     display_name: row.display_name,
     age: row.age,

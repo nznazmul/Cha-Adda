@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { ShieldCheck, Lock, AlertTriangle, Eye, PhoneCall, Flag, Heart } from "lucide-react";
+import { ShieldCheck, Lock, Eye, Flag } from "lucide-react";
 
 export default function SafetyPage() {
   return (

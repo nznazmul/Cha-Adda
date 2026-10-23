@@ -8,11 +8,9 @@ import {
   Heart, 
   MessageCircle, 
   User, 
-  ShieldAlert, 
   Moon, 
   Sun, 
   ShieldCheck, 
-  SlidersHorizontal,
   LogOut,
   Sparkles
 } from "lucide-react";
@@ -23,7 +21,7 @@ import { cn } from "@/lib/utils";
 export function Navbar() {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
-  const { user, switchDevUser, signOut, isSupabaseConfigured } = useAuth();
+  const { user, switchDevUser, signOut } = useAuth();
   const [showDevModal, setShowDevModal] = useState(false);
 
   const navLinks = [

@@ -17,23 +17,18 @@ const ThemeContext = createContext<ThemeContextType>({
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
-  const [mounted, setMounted] = useState(false);
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("cha_adda_theme") as Theme | null;
+      if (saved && (saved === "dark" || saved === "light")) return saved;
+    }
+    return "dark";
+  });
 
   useEffect(() => {
-    const saved = localStorage.getItem("cha_adda_theme") as Theme | null;
-    if (saved && (saved === "dark" || saved === "light")) {
-      setThemeState(saved);
-      document.documentElement.classList.toggle("dark", saved === "dark");
-      document.documentElement.classList.toggle("light", saved === "light");
-    } else {
-      // Default to dark theme as per design specification
-      setThemeState("dark");
-      document.documentElement.classList.add("dark");
-      document.documentElement.classList.remove("light");
-    }
-    setMounted(true);
-  }, []);
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.classList.toggle("light", theme === "light");
+  }, [theme]);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);

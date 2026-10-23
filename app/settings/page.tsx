@@ -3,16 +3,12 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { 
-  Settings, 
   Moon, 
   Sun, 
   Bell, 
-  EyeOff, 
   Lock, 
   Trash2, 
   LogOut, 
-  Shield, 
-  Check, 
   SlidersHorizontal 
 } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
@@ -79,7 +75,7 @@ export default function SettingsPage() {
           <div>
             <p className="text-sm font-semibold">Discoverable in Feed</p>
             <p className="text-xs text-muted-foreground">
-              When disabled, your card is hidden from others' discovery decks.
+              When disabled, your card is hidden from others&apos; discovery decks.
             </p>
           </div>
           <input

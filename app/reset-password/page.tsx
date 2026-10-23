@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Flame, Lock, ArrowRight, CheckCircle2, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -44,8 +43,8 @@ export default function ResetPasswordPage() {
           setLoading(false);
           return;
         }
-      } catch (err: any) {
-        setError(err?.message || "Failed to update password.");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to update password.");
         setLoading(false);
         return;
       }

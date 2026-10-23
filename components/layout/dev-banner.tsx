@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Info, Database, CheckCircle2, ChevronRight, X } from "lucide-react";
+import { Database, CheckCircle2, ChevronRight, X } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 
 export function DevBanner() {

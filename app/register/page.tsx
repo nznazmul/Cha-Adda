@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Flame, Mail, Lock, ShieldCheck, AlertCircle, ArrowRight, Check } from "lucide-react";
+import { Flame, Mail, Lock, AlertCircle, ArrowRight, Check } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { createClient } from "@/lib/supabase/client";
 
@@ -22,7 +22,7 @@ export default function RegisterPage() {
   const hasMinLength = password.length >= 8;
   const hasNumber = /\d/.test(password);
   const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-  const isPasswordStrong = hasMinLength && hasNumber;
+  const isPasswordStrong = hasMinLength && hasNumber && hasSpecial;
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +59,7 @@ export default function RegisterPage() {
 
     try {
       const supabase = createClient();
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
@@ -71,8 +71,8 @@ export default function RegisterPage() {
       }
 
       router.push("/onboarding");
-    } catch (err: any) {
-      setError(err?.message || "Failed to create account. Please try again.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create account. Please try again.");
       setLoading(false);
     }
   };

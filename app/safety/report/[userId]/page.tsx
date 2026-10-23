@@ -2,8 +2,7 @@
 
 import React, { useState, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { ShieldAlert, ArrowLeft, CheckCircle2, AlertCircle, ArrowRight } from "lucide-react";
+import { ShieldAlert, ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { submitReport } from "@/lib/services/safety-service";
 import { ReportCategory } from "@/types/database";
@@ -52,8 +51,8 @@ function ReportFormContent() {
         messageId,
       });
       setSubmitted(true);
-    } catch (err: any) {
-      setError(err?.message || "Failed to submit report. Please try again.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to submit report. Please try again.");
     } finally {
       setSubmitting(false);
     }

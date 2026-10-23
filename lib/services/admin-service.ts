@@ -174,7 +174,7 @@ export async function fetchAuditLogs(): Promise<AdminAuditLog[]> {
     return devStore.getAuditLogs();
   }
 
-  return data.map((d: any) => ({
+  return (data as (AdminAuditLog & { admin?: { display_name?: string } })[]).map((d) => ({
     ...d,
     admin_name: d.admin?.display_name || "Admin",
   }));

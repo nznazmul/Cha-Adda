@@ -18,7 +18,7 @@ import {
   Edit3
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
-import { calculateAge, cn } from "@/lib/utils";
+import { calculateAge } from "@/lib/utils";
 
 export default function ProfilePage() {
   const { user, updateCurrentProfile } = useAuth();

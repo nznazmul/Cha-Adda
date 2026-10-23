@@ -1,6 +1,5 @@
 import React from "react";
-import Link from "next/link";
-import { FileText, AlertCircle, CheckCircle } from "lucide-react";
+import { FileText } from "lucide-react";
 
 export default function TermsPage() {
   return (

@@ -1,4 +1,4 @@
-import { Profile, PublicProfile, ProfilePhoto, Swipe, Match, Message, Report, Notification, UserSettings, AdminAuditLog } from "@/types/database";
+import { Profile, PublicProfile, ProfilePhoto, Swipe, Match, Message, Report, Notification, AdminAuditLog } from "@/types/database";
 
 // Seed development profiles
 const initialProfiles: Profile[] = [
