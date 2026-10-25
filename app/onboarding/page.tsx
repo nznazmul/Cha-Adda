@@ -255,19 +255,25 @@ function OnboardingContent() {
                 I am a
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {(["woman", "man", "nonbinary", "other"] as const).map((g) => (
+                {[
+                  { id: "woman", label: "Woman" },
+                  { id: "man", label: "Man" },
+                  { id: "nonbinary", label: "Nonbinary" },
+                  { id: "other", label: "Other" },
+                ].map((item) => (
                   <button
-                    key={g}
+                    key={item.id}
                     type="button"
-                    onClick={() => setGender(g)}
+                    onClick={() => setGender(item.id as "woman" | "man" | "nonbinary" | "other")}
+                    aria-pressed={gender === item.id}
                     className={cn(
-                      "py-2 px-3 rounded-xl border text-xs font-semibold capitalize transition-all",
-                      gender === g
-                        ? "border-primary bg-primary text-white shadow-sm"
-                        : "border-border bg-background hover:bg-secondary text-foreground"
+                      "py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer",
+                      gender === item.id
+                        ? "border-rose-500 bg-gradient-to-r from-rose-600 to-rose-500 text-white font-bold shadow-md shadow-rose-500/30 ring-2 ring-rose-500/40"
+                        : "border-border/80 bg-background/80 hover:bg-secondary/40 text-foreground/80 hover:text-foreground"
                     )}
                   >
-                    {g}
+                    {item.label}
                   </button>
                 ))}
               </div>
@@ -278,19 +284,24 @@ function OnboardingContent() {
                 I want to meet
               </label>
               <div className="grid grid-cols-3 gap-2">
-                {["woman", "man", "nonbinary"].map((g) => (
+                {[
+                  { id: "woman", label: "Women" },
+                  { id: "man", label: "Men" },
+                  { id: "nonbinary", label: "Nonbinary" },
+                ].map((item) => (
                   <button
-                    key={g}
+                    key={item.id}
                     type="button"
-                    onClick={() => toggleInterestedIn(g)}
+                    onClick={() => toggleInterestedIn(item.id)}
+                    aria-pressed={interestedIn.includes(item.id)}
                     className={cn(
-                      "py-2 px-3 rounded-xl border text-xs font-semibold capitalize transition-all",
-                      interestedIn.includes(g)
-                        ? "border-rose-500 bg-rose-500/10 text-rose-500 font-bold"
-                        : "border-border bg-background hover:bg-secondary text-muted-foreground"
+                      "py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer",
+                      interestedIn.includes(item.id)
+                        ? "border-rose-500 bg-rose-500/20 text-rose-400 font-bold ring-2 ring-rose-500/30 shadow-sm"
+                        : "border-border/80 bg-background/80 hover:bg-secondary/40 text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    {g}s
+                    {item.label}
                   </button>
                 ))}
               </div>
