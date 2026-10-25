@@ -144,9 +144,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           data: { session },
         } = await supabase.auth.getSession();
 
+        let profileChannel: ReturnType<typeof supabase.channel> | undefined;
+
         if (session?.user) {
           const profile = await getOrProvisionProfile(supabase, session.user);
           setUser(profile);
+
+          profileChannel = supabase
+            .channel(`profile-realtime-${session.user.id}`)
+            .on(
+              "postgres_changes",
+              {
+                event: "UPDATE",
+                schema: "public",
+                table: "profiles",
+                filter: `id=eq.${session.user.id}`,
+              },
+              (payload: { new: Record<string, unknown> }) => {
+                if (payload.new) {
+                  setUser((prev) => ({ ...(prev || {}), ...(payload.new as unknown as Profile) }));
+                }
+              }
+            )
+            .subscribe();
         } else {
           setUser(null);
         }
@@ -173,7 +193,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         });
 
-        unsubscribe = () => subscription.unsubscribe();
+        unsubscribe = () => {
+          subscription.unsubscribe();
+          if (profileChannel) supabase.removeChannel(profileChannel);
+        };
       } catch (err) {
         console.error("Auth init error:", err);
         setUser(null);

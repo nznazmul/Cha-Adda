@@ -43,6 +43,20 @@ export default function LoginPage() {
       const activeProfile = await refreshAuth();
       router.refresh();
 
+      if (activeProfile?.account_status === "banned") {
+        await supabase.auth.signOut();
+        setError("This account has been permanently banned due to safety violations.");
+        setLoading(false);
+        return;
+      }
+
+      if (activeProfile?.account_status === "suspended") {
+        await supabase.auth.signOut();
+        setError("This account is temporarily suspended by platform moderators.");
+        setLoading(false);
+        return;
+      }
+
       if (activeProfile && !activeProfile.profile_complete) {
         router.push("/onboarding");
       } else {
