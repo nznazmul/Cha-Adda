@@ -25,7 +25,7 @@ export async function fetchDiscoveryCandidates(
     return devStore.getDiscoveryCandidates(currentUserId);
   }
 
-  return ((data as PublicProfile[]) || []).map((row) => ({
+  const candidates = ((data as PublicProfile[]) || []).map((row) => ({
     id: row.id,
     display_name: row.display_name,
     age: row.age,
@@ -42,6 +42,12 @@ export async function fetchDiscoveryCandidates(
     photos: row.photos || [],
     primary_photo_url: row.photos?.[0]?.url,
   }));
+
+  if (candidates.length === 0) {
+    return devStore.getDiscoveryCandidates(currentUserId);
+  }
+
+  return candidates;
 }
 
 export async function submitSwipe(

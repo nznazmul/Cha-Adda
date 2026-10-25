@@ -1,7 +1,9 @@
 import { Profile, PublicProfile, ProfilePhoto, Swipe, Match, Message, Report, Notification, AdminAuditLog } from "@/types/database";
+import { bengaliFemaleProfiles, bengaliFemalePhotos } from "@/lib/data/bengali-bots";
 
 // Seed development profiles
 const initialProfiles: Profile[] = [
+  ...bengaliFemaleProfiles,
   {
     id: "usr-aria-01",
     display_name: "Aria Vance",
@@ -131,6 +133,7 @@ const initialProfiles: Profile[] = [
 ];
 
 const initialPhotos: Record<string, ProfilePhoto[]> = {
+  ...bengaliFemalePhotos,
   "usr-aria-01": [
     {
       id: "ph-1",

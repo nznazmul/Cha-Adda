@@ -7,7 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "seed:bots": "node scripts/seed-bots.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
