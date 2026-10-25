@@ -39,32 +39,38 @@ export const metadata: Metadata = {
     template: "%s | CHA ADDA",
   },
   description:
-    "Discover real connections nearby, swipe, match, and chat in real-time. Safe, modern, and verified 18+ adult dating and matchmaking platform.",
+    "CHA ADDA (cha-adda-meet-swap) — Discover real connections nearby, swipe, match, and chat in real-time. Safe, modern, and verified 18+ adult dating and matchmaking platform.",
   keywords: [
-    "dating platform",
-    "matchmaking",
+    "cha-adda-meet-swap",
+    "cha adda meet swap",
     "cha adda",
+    "dating platform bangladesh",
+    "matchmaking",
     "adult dating 18+",
     "real time chat",
     "meet singles",
     "bangladesh dating",
     "verified relationships",
+    "cha-adda-meet-swap.vercel.app",
   ],
   authors: [{ name: "CHA ADDA Team" }],
   creator: "CHA ADDA",
   publisher: "CHA ADDA",
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
     url: appUrl,
-    siteName: "CHA ADDA",
-    title: "CHA ADDA — Modern 18+ Dating & Matchmaking Platform",
-    description: "Spark real connections over authentic dates. Swipe, match, and chat safely in real-time.",
+    siteName: "CHA ADDA (cha-adda-meet-swap)",
+    title: "CHA ADDA — Modern 18+ Dating & Matchmaking Platform (cha-adda-meet-swap)",
+    description: "Spark real connections over authentic dates. Swipe, match, and chat safely in real-time on cha-adda-meet-swap.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "CHA ADDA — Modern 18+ Dating & Matchmaking Platform",
-    description: "Discover real connections nearby. Safe, verified, real-time dating platform.",
+    title: "CHA ADDA — Modern 18+ Dating & Matchmaking Platform (cha-adda-meet-swap)",
+    description: "Discover real connections nearby. Safe, verified, real-time dating platform on cha-adda-meet-swap.",
   },
   robots: {
     index: true,
@@ -86,6 +92,29 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark h-full antialiased" suppressHydrationWarning>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebApplication",
+              name: "CHA ADDA",
+              alternateName: [
+                "cha-adda-meet-swap",
+                "Cha Adda Meet Swap",
+                "cha-adda-meet-swap.vercel.app",
+                "CHA ADDA Dating",
+              ],
+              url: appUrl,
+              applicationCategory: "SocialNetworkingApplication",
+              operatingSystem: "All",
+              description:
+                "CHA ADDA (cha-adda-meet-swap) — Discover real connections nearby, swipe, match, and chat in real-time. Safe, modern, and verified 18+ adult dating and matchmaking platform.",
+            }),
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} flex min-h-full flex-col bg-background text-foreground transition-colors`}
       >
