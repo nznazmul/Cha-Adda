@@ -57,7 +57,9 @@ export const metadata: Metadata = {
   creator: "CHA ADDA",
   publisher: "CHA ADDA",
   verification: {
-    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
+    google:
+      process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ||
+      "kjvXTBODzcV14Ew2YhZ4e1JPs20-lT6Ijz1Q7_SRDa4",
   },
   openGraph: {
     type: "website",
@@ -106,6 +108,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark h-full antialiased" suppressHydrationWarning>
       <head>
+        <meta
+          name="google-site-verification"
+          content="kjvXTBODzcV14Ew2YhZ4e1JPs20-lT6Ijz1Q7_SRDa4"
+        />
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/apple-icon.png" />
