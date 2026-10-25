@@ -1,4 +1,4 @@
-import { Profile, PublicProfile, ProfilePhoto, Swipe, Match, Message, Report, Notification, AdminAuditLog } from "@/types/database";
+import { Profile, PublicProfile, ProfilePhoto, Swipe, Match, Message, Report, Notification, AdminAuditLog, PlatformSettings } from "@/types/database";
 import { bengaliFemaleProfiles, bengaliFemalePhotos } from "@/lib/data/bengali-bots";
 
 // Seed development profiles
@@ -239,6 +239,13 @@ class DevDataStore {
   private notifications: Notification[] = [];
   private auditLogs: AdminAuditLog[] = [];
   private currentUserId: string = "usr-aria-01"; // Default dev actor
+  private platformSettings: PlatformSettings = {
+    min_age: 18,
+    max_photos: 6,
+    require_photo_to_discover: true,
+    maintenance_mode: false,
+    updated_at: new Date().toISOString(),
+  };
 
   constructor() {
     initialProfiles.forEach((p) => this.profiles.set(p.id, { ...p }));
@@ -603,6 +610,19 @@ class DevDataStore {
 
   getAuditLogs(): AdminAuditLog[] {
     return this.auditLogs;
+  }
+
+  getPlatformSettings(): PlatformSettings {
+    return { ...this.platformSettings };
+  }
+
+  savePlatformSettings(settings: Partial<PlatformSettings>): PlatformSettings {
+    this.platformSettings = {
+      ...this.platformSettings,
+      ...settings,
+      updated_at: new Date().toISOString(),
+    };
+    return { ...this.platformSettings };
   }
 }
 

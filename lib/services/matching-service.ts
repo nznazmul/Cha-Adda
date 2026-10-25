@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { getAppEnv } from "@/lib/config/env";
 import { devStore } from "@/lib/services/dev-store";
+import { fetchPlatformSettings } from "@/lib/services/platform-settings-service";
 import { PublicProfile, Match, SwipeAction } from "@/types/database";
 
 export async function fetchDiscoveryCandidates(
@@ -43,11 +44,14 @@ export async function fetchDiscoveryCandidates(
     primary_photo_url: row.photos?.[0]?.url,
   }));
 
-  if (candidates.length === 0) {
-    return devStore.getDiscoveryCandidates(currentUserId);
+  const settings = await fetchPlatformSettings();
+  let pool = candidates.length > 0 ? candidates : devStore.getDiscoveryCandidates(currentUserId);
+
+  if (settings.require_photo_to_discover) {
+    pool = pool.filter((c) => Boolean(c.primary_photo_url || (c.photos && c.photos.length > 0)));
   }
 
-  return candidates;
+  return pool;
 }
 
 export async function submitSwipe(

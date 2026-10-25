@@ -193,3 +193,12 @@ export interface AdminAnalyticsMetrics {
   suspendedUsers: number;
   bannedUsers: number;
 }
+
+export interface PlatformSettings {
+  min_age: number;
+  max_photos: number;
+  require_photo_to_discover: boolean;
+  maintenance_mode: boolean;
+  updated_at?: string;
+  updated_by?: string;
+}

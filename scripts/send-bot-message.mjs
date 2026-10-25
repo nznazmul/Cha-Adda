@@ -121,7 +121,7 @@ async function run() {
     }
   ], { onConflict: "from_user_id,to_user_id" });
 
-  let { data: match, error: matchErr } = await supabase
+  let { data: match } = await supabase
     .from("matches")
     .select("*")
     .eq("user_a_id", userA)
