@@ -54,8 +54,8 @@ export default function AdminReportsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold tracking-tight">Moderation Queue</h2>
-        <p className="text-xs text-muted-foreground">
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight">Moderation Queue</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
           Investigate user reports, review safety infractions, and take enforcement action.
         </p>
       </div>

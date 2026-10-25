@@ -46,7 +46,14 @@ export default function AdminOverviewPage() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight">System Overview</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Real-time member activity, match volume, report alerts, and safety health.
+        </p>
+      </div>
+
       {/* Metrics Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {statCards.map((card, idx) => {

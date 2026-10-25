@@ -34,8 +34,8 @@ export default function AdminPhotosPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold tracking-tight">Photo Moderation</h2>
-        <p className="text-xs text-muted-foreground">
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight">Photo Moderation</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
           Review uploaded profile photos for compliance with community guidelines.
         </p>
       </div>

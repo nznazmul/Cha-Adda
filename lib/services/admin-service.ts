@@ -179,3 +179,50 @@ export async function fetchAuditLogs(): Promise<AdminAuditLog[]> {
     admin_name: d.admin?.display_name || "Admin",
   }));
 }
+
+export async function updateUserByAdmin(
+  userId: string,
+  adminId: string,
+  updates: {
+    display_name?: string;
+    city?: string;
+    bio?: string;
+    gender?: Profile["gender"];
+    role?: Profile["role"];
+    account_status?: Profile["account_status"];
+    reason?: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch("/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, updates }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: data.error || "Failed to update user." };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    console.error("updateUserByAdmin error:", err);
+    // Local fallback if running completely offline/dev
+    const { isSupabaseConfigured } = getAppEnv();
+    if (!isSupabaseConfigured) {
+      if (updates.account_status) {
+        devStore.updateUserStatus(userId, updates.account_status, adminId, updates.reason);
+      }
+      const existing = devStore.getProfile(userId);
+      if (existing) {
+        devStore.saveProfile({ ...existing, ...updates } as Profile);
+      }
+      return { success: true };
+    }
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Network error during update.",
+    };
+  }
+}

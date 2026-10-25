@@ -18,8 +18,8 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold tracking-tight">System Configuration</h2>
-        <p className="text-xs text-muted-foreground">
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight">System Configuration</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
           Platform-wide dating constraints, upload limits, and safety controls.
         </p>
       </div>

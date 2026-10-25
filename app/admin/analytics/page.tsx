@@ -17,8 +17,8 @@ export default function AdminAnalyticsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold tracking-tight">Product & Safety Analytics</h2>
-        <p className="text-xs text-muted-foreground">
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight">Product & Safety Analytics</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
           Platform engagement, conversion to match, and moderation resolution metrics.
         </p>
       </div>
