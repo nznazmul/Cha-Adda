@@ -26,7 +26,21 @@ export default function AdminReportsPage() {
   };
 
   useEffect(() => {
-    loadReports();
+    let mounted = true;
+    async function init() {
+      try {
+        const data = await fetchModerationReports();
+        if (mounted) setReports(data);
+      } catch (err) {
+        console.error("Failed to load reports:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    init();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleAction = async (reportId: string, status: Report["status"], note: string) => {

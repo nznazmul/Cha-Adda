@@ -3,13 +3,11 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Flame, Mail, Lock, AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
-import { useAuth } from "@/components/providers/auth-context";
+import { Flame, Mail, Lock, AlertCircle, ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { isSupabaseConfigured } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +26,7 @@ export default function LoginPage() {
 
     try {
       const supabase = createClient();
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
+      const { error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -40,8 +38,8 @@ export default function LoginPage() {
       }
 
       router.push("/discover");
-    } catch (err: any) {
-      setError(err?.message || "Failed to log in. Please check your credentials.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to log in. Please check your credentials.");
       setLoading(false);
     }
   };

@@ -29,7 +29,21 @@ export default function AdminUsersPage() {
   };
 
   useEffect(() => {
-    loadData();
+    let mounted = true;
+    async function init() {
+      try {
+        const data = await fetchAdminUsers();
+        if (mounted) setUsers(data);
+      } catch (err) {
+        console.error("Error loading users:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    init();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleStatusChange = async (userId: string, newStatus: Profile["account_status"]) => {

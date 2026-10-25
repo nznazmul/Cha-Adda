@@ -58,23 +58,6 @@ export default function DiscoverPage() {
     loadCandidates();
   }, [user]);
 
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (inspectProfile || matchModal.isOpen) return;
-      if (e.key === "ArrowLeft") handlePass();
-      if (e.key === "ArrowRight") handleLike();
-      if (e.key === " " || e.key === "ArrowUp") {
-        e.preventDefault();
-        const current = candidates[currentIndex];
-        if (current) setInspectProfile(current);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIndex, candidates, inspectProfile, matchModal]);
-
   const currentCandidate = candidates[currentIndex];
 
   const handleSwipeAction = async (action: "like" | "pass") => {
@@ -106,7 +89,24 @@ export default function DiscoverPage() {
   const handleLike = () => handleSwipeAction("like");
   const handlePass = () => handleSwipeAction("pass");
 
-  const handleDragEnd = (_: any, info: any) => {
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (inspectProfile || matchModal.isOpen) return;
+      if (e.key === "ArrowLeft") handlePass();
+      if (e.key === "ArrowRight") handleLike();
+      if (e.key === " " || e.key === "ArrowUp") {
+        e.preventDefault();
+        const current = candidates[currentIndex];
+        if (current) setInspectProfile(current);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentIndex, candidates, inspectProfile, matchModal, currentCandidate]);
+
+  const handleDragEnd = (_: unknown, info: { offset: { x: number } }) => {
     const threshold = 100;
     if (info.offset.x > threshold) {
       handleLike();
@@ -137,7 +137,7 @@ export default function DiscoverPage() {
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-secondary text-primary mb-4">
             <Sparkles className="h-8 w-8" />
           </div>
-          <h2 className="text-xl font-bold tracking-tight">You've seen everyone nearby!</h2>
+          <h2 className="text-xl font-bold tracking-tight">You&apos;ve seen everyone nearby!</h2>
           <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
             There are no new candidates matching your current filters. Check back soon or broaden your discovery preferences.
           </p>

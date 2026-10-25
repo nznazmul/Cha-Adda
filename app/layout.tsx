@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -19,10 +19,63 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0f0c1b" },
+    { media: "(prefers-color-scheme: light)", color: "#fff5f7" },
+  ],
+};
+
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://cha-adda-meet-swap.vercel.app";
+
 export const metadata: Metadata = {
-  title: "CHA ADDA — Full-Stack Dating & Matchmaking Platform",
+  metadataBase: new URL(appUrl),
+  title: {
+    default: "CHA ADDA — Modern 18+ Dating & Matchmaking Platform",
+    template: "%s | CHA ADDA",
+  },
   description:
-    "Discover real connections, swipe, match, and chat in real-time. Safe, modern, and verified adult dating platform.",
+    "Discover real connections nearby, swipe, match, and chat in real-time. Safe, modern, and verified 18+ adult dating and matchmaking platform.",
+  keywords: [
+    "dating platform",
+    "matchmaking",
+    "cha adda",
+    "adult dating 18+",
+    "real time chat",
+    "meet singles",
+    "bangladesh dating",
+    "verified relationships",
+  ],
+  authors: [{ name: "CHA ADDA Team" }],
+  creator: "CHA ADDA",
+  publisher: "CHA ADDA",
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: appUrl,
+    siteName: "CHA ADDA",
+    title: "CHA ADDA — Modern 18+ Dating & Matchmaking Platform",
+    description: "Spark real connections over authentic dates. Swipe, match, and chat safely in real-time.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CHA ADDA — Modern 18+ Dating & Matchmaking Platform",
+    description: "Discover real connections nearby. Safe, verified, real-time dating platform.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
 };
 
 export default function RootLayout({

@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { 
   Flame, 
   Heart, 
@@ -9,26 +10,23 @@ import {
   Sparkles, 
   MessageCircle, 
   CheckCircle, 
-  ArrowRight,
-  Coffee,
-  Compass,
-  Lock,
-  UserCheck
+  ArrowRight
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 
 export default function LandingPage() {
   const { user } = useAuth();
+  const router = useRouter();
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get("code");
       if (code) {
-        window.location.href = `/auth/callback?code=${code}&next=/reset-password`;
+        router.push(`/auth/callback?code=${code}&next=/reset-password`);
       }
     }
-  }, []);
+  }, [router]);
 
   return (
     <div className="flex flex-col items-center overflow-hidden">
@@ -215,7 +213,7 @@ export default function LandingPage() {
             href="/register"
             className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500 px-8 py-4 text-base font-bold text-white shadow-xl shadow-rose-500/30 hover:scale-105 active:scale-95 transition-all"
           >
-            <span>Get Started — It's Free</span>
+            <span>Get Started — It&apos;s Free</span>
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

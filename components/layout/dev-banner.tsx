@@ -8,7 +8,7 @@ export function DevBanner() {
   const { isSupabaseConfigured } = useAuth();
   const [dismissed, setDismissed] = useState(false);
 
-  if (dismissed) return null;
+  if (dismissed || process.env.NODE_ENV === "production") return null;
 
   if (isSupabaseConfigured) {
     return (

@@ -250,7 +250,7 @@ function ChatConversationContent() {
                   onClick={() => setInputText(starter)}
                   className="px-3 py-1.5 rounded-full border border-border bg-card text-xs text-muted-foreground hover:border-primary hover:text-primary transition-all text-left"
                 >
-                  "{starter}"
+                  &quot;{starter}&quot;
                 </button>
               ))}
             </div>
@@ -315,7 +315,7 @@ function ChatConversationContent() {
           <div className="max-w-sm w-full rounded-3xl border border-border bg-card p-6 text-center space-y-4 shadow-xl">
             <h3 className="text-lg font-bold">Unmatch {partner?.display_name}?</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              This will remove them from your matches and disable messaging. You won't be able to undo this action.
+              This will remove them from your matches and disable messaging. You won&apos;t be able to undo this action.
             </p>
             <div className="flex gap-2 pt-2">
               <button

@@ -30,12 +30,15 @@ function PublicProfileViewContent() {
   const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
-    if (!userId) return;
-    const rawProfile = devStore.getProfile(userId);
-    if (rawProfile) {
-      setProfile(devStore.toPublicProfile(rawProfile));
+    async function load() {
+      if (!userId) return;
+      const rawProfile = devStore.getProfile(userId);
+      if (rawProfile) {
+        setProfile(devStore.toPublicProfile(rawProfile));
+      }
+      setLoading(false);
     }
-    setLoading(false);
+    load();
   }, [userId]);
 
   const handleLike = async () => {
