@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Flame, Mail, Lock, AlertCircle, ArrowRight, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/components/providers/auth-context";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { refreshAuth } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -61,6 +63,8 @@ export default function RegisterPage() {
         return;
       }
 
+      await refreshAuth();
+      router.refresh();
       router.push("/onboarding");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create account. Please try again.");

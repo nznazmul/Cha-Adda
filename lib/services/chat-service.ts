@@ -80,9 +80,9 @@ export function subscribeToMatchMessages(
         table: "messages",
         filter: `match_id=eq.${matchId}`,
       },
-      (payload) => {
+      (payload: { new: Message }) => {
         if (payload.new) {
-          onNewMessage(payload.new as Message);
+          onNewMessage(payload.new);
         }
       }
     )

@@ -6,8 +6,11 @@ import { useRouter } from "next/navigation";
 import { Flame, Mail, Lock, AlertCircle, ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
+import { useAuth } from "@/components/providers/auth-context";
+
 export default function LoginPage() {
   const router = useRouter();
+  const { refreshAuth } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +40,14 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/discover");
+      const activeProfile = await refreshAuth();
+      router.refresh();
+
+      if (activeProfile && !activeProfile.profile_complete) {
+        router.push("/onboarding");
+      } else {
+        router.push("/discover");
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to log in. Please check your credentials.");
       setLoading(false);
