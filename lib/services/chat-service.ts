@@ -1,7 +1,70 @@
 import { createClient } from "@/lib/supabase/client";
 import { getAppEnv } from "@/lib/config/env";
 import { devStore } from "@/lib/services/dev-store";
-import { Message } from "@/types/database";
+import { Message, Match, PublicProfile } from "@/types/database";
+
+export async function fetchMatchDetails(
+  matchId: string,
+  currentUserId: string
+): Promise<Match | null> {
+  const { isSupabaseConfigured } = getAppEnv();
+
+  if (!isSupabaseConfigured) {
+    return devStore.getMatch(matchId, currentUserId) || null;
+  }
+
+  const supabase = createClient();
+  const { data: match, error } = await supabase
+    .from("matches")
+    .select("id, user_a_id, user_b_id, status, created_at")
+    .eq("id", matchId)
+    .single();
+
+  if (error || !match) {
+    return devStore.getMatch(matchId, currentUserId) || null;
+  }
+
+  const otherId = match.user_a_id === currentUserId ? match.user_b_id : match.user_a_id;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, display_name, date_of_birth, gender, bio, city, job_title, education, dating_intentions, interests, languages")
+    .eq("id", otherId)
+    .single();
+
+  const { data: photos } = await supabase
+    .from("profile_photos")
+    .select("*")
+    .eq("user_id", otherId)
+    .order("is_primary", { ascending: false });
+
+  if (!profile) {
+    return devStore.getMatch(matchId, currentUserId) || null;
+  }
+
+  const birth = new Date(profile.date_of_birth);
+  const age = Math.max(18, new Date().getFullYear() - birth.getFullYear());
+
+  const otherUser: PublicProfile = {
+    id: profile.id,
+    display_name: profile.display_name,
+    age,
+    gender: profile.gender,
+    bio: profile.bio,
+    city: profile.city,
+    job_title: profile.job_title,
+    education: profile.education,
+    dating_intentions: profile.dating_intentions || [],
+    interests: profile.interests || [],
+    languages: profile.languages || [],
+    photos: photos || [],
+    primary_photo_url: photos?.[0]?.url,
+  };
+
+  return {
+    ...match,
+    other_user: otherUser,
+  };
+}
 
 export async function fetchConversationMessages(matchId: string): Promise<Message[]> {
   const { isSupabaseConfigured } = getAppEnv();

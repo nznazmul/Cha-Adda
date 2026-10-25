@@ -19,6 +19,7 @@ import {
 import { useAuth } from "@/components/providers/auth-context";
 import { 
   fetchConversationMessages, 
+  fetchMatchDetails,
   postChatMessage, 
   subscribeToMatchMessages 
 } from "@/lib/services/chat-service";
@@ -49,7 +50,7 @@ function ChatConversationContent() {
       setLoading(true);
 
       // Load partner profile info
-      const match = devStore.getMatch(matchId, user.id);
+      const match = await fetchMatchDetails(matchId, user.id);
       if (match?.other_user) {
         setPartner(match.other_user);
       } else {
