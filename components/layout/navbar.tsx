@@ -21,8 +21,7 @@ import { cn } from "@/lib/utils";
 export function Navbar() {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
-  const { user, switchDevUser, signOut } = useAuth();
-  const [showDevModal, setShowDevModal] = useState(false);
+  const { user, signOut } = useAuth();
 
   const navLinks = [
     { href: "/discover", label: "Discover", icon: Flame },
@@ -105,15 +104,16 @@ export function Navbar() {
             )}
           </button>
 
-          {/* User Quick Switcher (For local testing & pairing simulation) */}
-          <button
-            onClick={() => setShowDevModal(!showDevModal)}
-            title="Switch Test Account"
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border/60 text-xs font-semibold bg-secondary/60 hover:bg-secondary text-foreground transition-colors"
-          >
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
-            <span>{user ? user.display_name.split(" ")[0] : "Demo Persona"}</span>
-          </button>
+          {/* User Profile / Name Badge */}
+          {user && (
+            <Link
+              href="/profile"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border/60 text-xs font-semibold bg-secondary/60 hover:bg-secondary text-foreground transition-colors"
+            >
+              <User className="h-3.5 w-3.5 text-primary" />
+              <span>{user.display_name.split(" ")[0]}</span>
+            </Link>
+          )}
 
           {/* Authentication Actions */}
           {!user ? (
@@ -153,43 +153,6 @@ export function Navbar() {
           )}
         </div>
       </div>
-
-      {/* Dev Switcher Drawer / Dropdown */}
-      {showDevModal && (
-        <div className="border-t border-border/60 bg-card/95 backdrop-blur-md px-4 py-3 shadow-lg">
-          <div className="mx-auto max-w-7xl flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-primary uppercase tracking-wider">Test Personas:</span>
-              <span className="text-muted-foreground">Switch identity to test mutual matching & real-time chat:</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: "usr-aria-01", name: "Aria (Woman)", role: "user" },
-                { id: "usr-julian-02", name: "Julian (Man)", role: "user" },
-                { id: "usr-maya-03", name: "Maya (Woman)", role: "user" },
-                { id: "usr-kaelen-04", name: "Kaelen (Man - Matched)", role: "user" },
-                { id: "usr-admin-lead", name: "Admin Lead (Safety)", role: "admin" },
-              ].map((persona) => (
-                <button
-                  key={persona.id}
-                  onClick={() => {
-                    switchDevUser(persona.id);
-                    setShowDevModal(false);
-                  }}
-                  className={cn(
-                    "px-2.5 py-1 rounded-md font-medium transition-all",
-                    user?.id === persona.id
-                      ? "bg-primary text-white shadow-sm"
-                      : "bg-secondary text-secondary-foreground hover:bg-primary/20"
-                  )}
-                >
-                  {persona.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
 }
