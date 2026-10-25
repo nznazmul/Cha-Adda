@@ -20,6 +20,16 @@ import { useAuth } from "@/components/providers/auth-context";
 export default function LandingPage() {
   const { user } = useAuth();
 
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get("code");
+      if (code) {
+        window.location.href = `/auth/callback?code=${code}&next=/reset-password`;
+      }
+    }
+  }, []);
+
   return (
     <div className="flex flex-col items-center overflow-hidden">
       {/* Hero Section */}
