@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { isSupabaseConfigured, switchDevUser } = useAuth();
+  const { isSupabaseConfigured } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -49,13 +49,6 @@ export default function RegisterPage() {
     }
 
     setLoading(true);
-
-    if (!isSupabaseConfigured) {
-      // In dev mode, proceed to onboarding
-      switchDevUser("usr-aria-01");
-      router.push("/onboarding");
-      return;
-    }
 
     try {
       const supabase = createClient();

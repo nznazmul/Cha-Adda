@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, switchDevUser } = useAuth();
+  const { user } = useAuth();
 
   const isAdminOrMod = user?.role === "admin" || user?.role === "moderator";
 
@@ -45,12 +45,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           The current account (<strong>{user?.display_name || "Guest"}</strong>) does not have moderator or administrator privileges.
         </p>
         <div className="pt-2 flex flex-col gap-2">
-          <button
-            onClick={() => switchDevUser("usr-admin-lead")}
-            className="w-full py-2.5 rounded-xl bg-primary text-white text-xs font-bold shadow-md shadow-primary/25 hover:opacity-95"
-          >
-            🛡️ Switch to Admin Lead (Demo Persona)
-          </button>
           <Link
             href="/discover"
             className="w-full py-2.5 rounded-xl border border-border text-xs font-semibold hover:bg-secondary"

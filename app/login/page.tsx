@@ -3,13 +3,13 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Flame, Mail, Lock, AlertCircle, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
+import { Flame, Mail, Lock, AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { switchDevUser, isSupabaseConfigured } = useAuth();
+  const { isSupabaseConfigured } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -23,13 +23,6 @@ export default function LoginPage() {
     if (!email || !password) {
       setError("Please fill in both email and password.");
       setLoading(false);
-      return;
-    }
-
-    if (!isSupabaseConfigured) {
-      // Dev mode: simulate authentic login
-      switchDevUser("usr-aria-01");
-      router.push("/discover");
       return;
     }
 
@@ -51,11 +44,6 @@ export default function LoginPage() {
       setError(err?.message || "Failed to log in. Please check your credentials.");
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = (userId: string) => {
-    switchDevUser(userId);
-    router.push("/discover");
   };
 
   return (
@@ -137,37 +125,6 @@ export default function LoginPage() {
             <ArrowRight className="h-4 w-4" />
           </button>
         </form>
-
-        {/* Quick Test Login Presets (Useful for evaluators) */}
-        <div className="pt-2 border-t border-border/60">
-          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 text-center flex items-center justify-center gap-1">
-            <Sparkles className="h-3 w-3 text-primary" />
-            <span>Instant Demo Sign In</span>
-          </p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("usr-aria-01")}
-              className="px-3 py-2 rounded-lg border border-border bg-secondary/50 hover:bg-secondary font-medium text-left truncate transition-colors"
-            >
-              👩 Aria Vance (User)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("usr-julian-02")}
-              className="px-3 py-2 rounded-lg border border-border bg-secondary/50 hover:bg-secondary font-medium text-left truncate transition-colors"
-            >
-              👨 Julian Ross (User)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("usr-admin-lead")}
-              className="col-span-2 px-3 py-2 rounded-lg border border-border bg-primary/10 hover:bg-primary/20 text-primary font-semibold text-center transition-colors"
-            >
-              🛡️ Admin Lead (Moderation & Safety)
-            </button>
-          </div>
-        </div>
 
         {/* Registration Link */}
         <div className="text-center text-xs text-muted-foreground pt-2">
