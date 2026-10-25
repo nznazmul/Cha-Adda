@@ -2,14 +2,14 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  Moon, 
-  Sun, 
-  Bell, 
-  Lock, 
-  Trash2, 
-  LogOut, 
-  SlidersHorizontal 
+import {
+  Moon,
+  Sun,
+  Bell,
+  Lock,
+  Trash2,
+  LogOut,
+  SlidersHorizontal
 } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useAuth } from "@/components/providers/auth-context";

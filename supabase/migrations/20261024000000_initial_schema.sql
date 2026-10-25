@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS matches (
   unmatched_by UUID REFERENCES profiles(id),
   
   -- Canonical pair ordering guarantee: user_a_id < user_b_id
-  CONSTRAINT chk_canonical_pair ORDER CHECK (user_a_id < user_b_id),
+  CONSTRAINT chk_canonical_pair CHECK (user_a_id < user_b_id),
   CONSTRAINT uq_matches_pair UNIQUE (user_a_id, user_b_id)
 );
 

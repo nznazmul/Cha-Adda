@@ -30,6 +30,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { isSupabaseConfigured } = getAppEnv();
 
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+
     async function initAuth() {
       if (!isSupabaseConfigured) {
         // Load default dev user from devStore
@@ -48,23 +50,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .from("profiles")
             .select("*")
             .eq("id", session.user.id)
-            .single();
+            .maybeSingle();
 
           setUser(profile || null);
         } else {
           setUser(null);
         }
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+          if (session?.user) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", session.user.id)
+              .maybeSingle();
+            setUser(profile || null);
+          } else {
+            setUser(null);
+          }
+        });
+        unsubscribe = () => subscription.unsubscribe();
       } catch (err) {
         console.error("Auth init error:", err);
-        // Fallback to dev profile
-        const p = devStore.getProfile("usr-aria-01");
-        setUser(p || null);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
     }
 
     initAuth();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [isSupabaseConfigured]);
 
   const switchDevUser = (userId: string) => {
@@ -81,11 +99,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
-  const updateCurrentProfile = (updates: Partial<Profile>) => {
-    if (!user) return;
-    const updated = { ...user, ...updates };
+  const updateCurrentProfile = async (updates: Partial<Profile>) => {
+    const updated = { ...(user || {}), ...updates } as Profile;
     setUser(updated);
     devStore.saveProfile(updated);
+
+    if (isSupabaseConfigured) {
+      try {
+        const supabase = createClient();
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          const profilePayload = {
+            id: authUser.id,
+            display_name: updates.display_name || user?.display_name || "New Member",
+            date_of_birth: updates.date_of_birth || user?.date_of_birth || "2000-01-01",
+            gender: updates.gender || user?.gender || "nonbinary",
+            city: updates.city || user?.city || "Dhaka",
+            ...updates,
+            updated_at: new Date().toISOString(),
+          };
+          const { data: savedProfile, error } = await supabase
+            .from("profiles")
+            .upsert(profilePayload)
+            .select()
+            .maybeSingle();
+
+          if (!error && savedProfile) {
+            setUser(savedProfile);
+          } else if (error) {
+            console.error("Supabase profile save error:", error);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to update profile in Supabase:", err);
+      }
+    }
   };
 
   return (
