@@ -198,6 +198,20 @@ export default function AdminUsersPage() {
       });
 
       if (res.success) {
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === editingUser.id
+              ? {
+                  ...u,
+                  display_name: editForm.display_name.trim(),
+                  city: editForm.city.trim(),
+                  bio: editForm.bio.trim(),
+                  role: editForm.role,
+                  account_status: editForm.account_status,
+                }
+              : u
+          )
+        );
         setActionNotice({
           text: `Updated profile for "${editForm.display_name}" successfully (Role: ${editForm.role}, Status: ${editForm.account_status})`,
           type: "success",
@@ -222,12 +236,29 @@ export default function AdminUsersPage() {
   };
 
   const handleQuickStatusChange = async (userId: string, newStatus: Profile["account_status"]) => {
-    if (!currentAdmin) return;
-    await setAccountStatus(userId, newStatus, currentAdmin.id, `Quick admin action: ${newStatus}`);
-    setActionNotice({
-      text: `User status changed to ${newStatus}`,
-      type: "success",
-    });
+    const adminId = currentAdmin?.id || "admin";
+    // 1. Optimistically update local users state immediately
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, account_status: newStatus } : u))
+    );
+
+    const ok = await setAccountStatus(userId, newStatus, adminId, `Quick admin action: ${newStatus}`);
+    if (ok) {
+      const statusLabels: Record<string, string> = {
+        active: "Active",
+        suspended: "Suspended",
+        banned: "Banned",
+      };
+      setActionNotice({
+        text: `User status changed to ${statusLabels[newStatus] || newStatus}`,
+        type: "success",
+      });
+    } else {
+      setActionNotice({
+        text: `Failed to update status to ${newStatus}`,
+        type: "error",
+      });
+    }
     await loadData();
     setTimeout(() => setActionNotice(null), 3000);
   };
@@ -257,20 +288,55 @@ export default function AdminUsersPage() {
           </p>
         </div>
 
-        {/* Status Counters */}
-        <div className="flex items-center gap-2 text-xs">
-          <div className="px-3 py-1.5 rounded-xl border border-border/80 bg-card font-semibold flex items-center gap-1.5 shadow-sm">
+        {/* Interactive Status Filter Counters */}
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => setStatusFilter("all")}
+            className={`px-3 py-1.5 rounded-xl border font-semibold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 ${
+              statusFilter === "all"
+                ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20"
+                : "border-border/80 bg-card hover:bg-secondary text-muted-foreground"
+            }`}
+          >
+            <span>All: {users.length}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter(statusFilter === "active" ? "all" : "active")}
+            className={`px-3 py-1.5 rounded-xl border font-semibold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 ${
+              statusFilter === "active"
+                ? "border-emerald-500 bg-emerald-500/15 text-emerald-400 ring-2 ring-emerald-500/30 font-bold"
+                : "border-border/80 bg-card hover:bg-secondary text-foreground"
+            }`}
+          >
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
             <span>Active: {activeCount}</span>
-          </div>
-          <div className="px-3 py-1.5 rounded-xl border border-border/80 bg-card font-semibold flex items-center gap-1.5 shadow-sm">
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter(statusFilter === "suspended" ? "all" : "suspended")}
+            className={`px-3 py-1.5 rounded-xl border font-semibold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 ${
+              statusFilter === "suspended"
+                ? "border-amber-500 bg-amber-500/15 text-amber-400 ring-2 ring-amber-500/30 font-bold"
+                : "border-border/80 bg-card hover:bg-secondary text-foreground"
+            }`}
+          >
             <span className="h-2 w-2 rounded-full bg-amber-500" />
             <span>Suspended: {suspendedCount}</span>
-          </div>
-          <div className="px-3 py-1.5 rounded-xl border border-border/80 bg-card font-semibold flex items-center gap-1.5 shadow-sm">
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter(statusFilter === "banned" ? "all" : "banned")}
+            className={`px-3 py-1.5 rounded-xl border font-semibold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 ${
+              statusFilter === "banned"
+                ? "border-rose-500 bg-rose-500/15 text-rose-400 ring-2 ring-rose-500/30 font-bold"
+                : "border-border/80 bg-card hover:bg-secondary text-foreground"
+            }`}
+          >
             <span className="h-2 w-2 rounded-full bg-rose-500" />
             <span>Banned: {bannedCount}</span>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -336,7 +402,11 @@ export default function AdminUsersPage() {
           </div>
         ) : filteredUsers.length === 0 ? (
           <div className="p-8 text-center text-xs text-muted-foreground bg-card rounded-3xl border border-border">
-            No users matching criteria.
+            {statusFilter === "banned"
+              ? "কোনো বহিষ্কৃত (Banned) ব্যবহারকারী নেই।"
+              : statusFilter === "suspended"
+              ? "কোনো স্থগিত (Suspended) ব্যবহারকারী নেই।"
+              : "No users matching criteria."}
           </div>
         ) : (
           filteredUsers.map((u) => {
@@ -425,15 +495,8 @@ export default function AdminUsersPage() {
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
-                    {u.account_status !== "active" ? (
-                      <button
-                        onClick={() => handleQuickStatusChange(u.id, "active")}
-                        className="px-2.5 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 text-[11px] font-bold transition-colors"
-                      >
-                        Restore
-                      </button>
-                    ) : (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {u.account_status === "active" && (
                       <>
                         <button
                           onClick={() => handleQuickStatusChange(u.id, "suspended")}
@@ -446,6 +509,38 @@ export default function AdminUsersPage() {
                           className="px-2.5 py-1 rounded-xl bg-destructive/10 hover:bg-destructive hover:text-white text-destructive text-[11px] font-bold transition-colors"
                         >
                           Ban
+                        </button>
+                      </>
+                    )}
+                    {u.account_status === "suspended" && (
+                      <>
+                        <button
+                          onClick={() => handleQuickStatusChange(u.id, "active")}
+                          className="px-2.5 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 text-[11px] font-bold transition-colors"
+                        >
+                          Restore
+                        </button>
+                        <button
+                          onClick={() => handleQuickStatusChange(u.id, "banned")}
+                          className="px-2.5 py-1 rounded-xl bg-destructive/10 hover:bg-destructive hover:text-white text-destructive text-[11px] font-bold transition-colors"
+                        >
+                          Ban
+                        </button>
+                      </>
+                    )}
+                    {u.account_status === "banned" && (
+                      <>
+                        <button
+                          onClick={() => handleQuickStatusChange(u.id, "active")}
+                          className="px-2.5 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 text-[11px] font-bold transition-colors"
+                        >
+                          Unban
+                        </button>
+                        <button
+                          onClick={() => handleQuickStatusChange(u.id, "suspended")}
+                          className="px-2.5 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500 hover:text-white text-amber-500 text-[11px] font-bold transition-colors"
+                        >
+                          Suspend
                         </button>
                       </>
                     )}
@@ -482,7 +577,11 @@ export default function AdminUsersPage() {
               ) : filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-muted-foreground">
-                    No users matching criteria.
+                    {statusFilter === "banned"
+                      ? "কোনো বহিষ্কৃত (Banned) ব্যবহারকারী নেই।"
+                      : statusFilter === "suspended"
+                      ? "কোনো স্থগিত (Suspended) ব্যবহারকারী নেই।"
+                      : "No users matching criteria."}
                   </td>
                 </tr>
               ) : (
@@ -578,26 +677,57 @@ export default function AdminUsersPage() {
                           </button>
 
                           {/* Quick Status Buttons */}
-                          {u.account_status !== "active" ? (
-                            <button
-                              onClick={() => handleQuickStatusChange(u.id, "active")}
-                              className="px-2.5 py-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 text-xs font-bold transition-colors"
-                            >
-                              Restore
-                            </button>
-                          ) : (
+                          {u.account_status === "active" && (
                             <>
                               <button
                                 onClick={() => handleQuickStatusChange(u.id, "suspended")}
                                 className="px-2.5 py-1.5 rounded-xl border border-amber-500/20 bg-amber-500/10 hover:bg-amber-500 hover:text-white text-amber-500 text-xs font-bold transition-colors"
+                                title="Suspend User"
                               >
                                 Suspend
                               </button>
                               <button
                                 onClick={() => handleQuickStatusChange(u.id, "banned")}
                                 className="px-2.5 py-1.5 rounded-xl border border-destructive/20 bg-destructive/10 hover:bg-destructive hover:text-white text-destructive text-xs font-bold transition-colors"
+                                title="Permanently Ban User"
                               >
                                 Ban
+                              </button>
+                            </>
+                          )}
+                          {u.account_status === "suspended" && (
+                            <>
+                              <button
+                                onClick={() => handleQuickStatusChange(u.id, "active")}
+                                className="px-2.5 py-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 text-xs font-bold transition-colors"
+                                title="Restore User to Active"
+                              >
+                                Restore
+                              </button>
+                              <button
+                                onClick={() => handleQuickStatusChange(u.id, "banned")}
+                                className="px-2.5 py-1.5 rounded-xl border border-destructive/20 bg-destructive/10 hover:bg-destructive hover:text-white text-destructive text-xs font-bold transition-colors"
+                                title="Escalate to Permanent Ban"
+                              >
+                                Ban
+                              </button>
+                            </>
+                          )}
+                          {u.account_status === "banned" && (
+                            <>
+                              <button
+                                onClick={() => handleQuickStatusChange(u.id, "active")}
+                                className="px-2.5 py-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 text-xs font-bold transition-colors"
+                                title="Unban User"
+                              >
+                                Unban
+                              </button>
+                              <button
+                                onClick={() => handleQuickStatusChange(u.id, "suspended")}
+                                className="px-2.5 py-1.5 rounded-xl border border-amber-500/20 bg-amber-500/10 hover:bg-amber-500 hover:text-white text-amber-500 text-xs font-bold transition-colors"
+                                title="Downgrade to Suspended"
+                              >
+                                Suspend
                               </button>
                             </>
                           )}

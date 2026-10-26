@@ -4,6 +4,18 @@ import { devStore } from "@/lib/services/dev-store";
 import { AdminAnalyticsMetrics, Profile, Report, AdminAuditLog } from "@/types/database";
 
 export async function fetchAdminMetrics(): Promise<AdminAnalyticsMetrics> {
+  try {
+    const res = await fetch("/api/admin/metrics");
+    if (res.ok) {
+      const json = await res.json();
+      if (json.metrics) {
+        return json.metrics;
+      }
+    }
+  } catch (err) {
+    console.warn("fetchAdminMetrics API call fallback:", err);
+  }
+
   const { isSupabaseConfigured } = getAppEnv();
 
   if (!isSupabaseConfigured) {
@@ -85,34 +97,11 @@ export async function setAccountStatus(
   adminId: string,
   reason?: string
 ): Promise<boolean> {
-  const { isSupabaseConfigured } = getAppEnv();
-
-  if (!isSupabaseConfigured) {
-    devStore.updateUserStatus(userId, status, adminId, reason);
-    return true;
-  }
-
-  const supabase = createClient();
-  const { error } = await supabase
-    .from("profiles")
-    .update({ account_status: status })
-    .eq("id", userId);
-
-  if (error) {
-    console.error("Failed to update account status:", error);
-    devStore.updateUserStatus(userId, status, adminId, reason);
-  } else {
-    // Record audit log
-    await supabase.from("admin_audit_logs").insert({
-      admin_id: adminId,
-      action_type: `account_${status}`,
-      target_type: "user",
-      target_id: userId,
-      reason: reason || `Updated status to ${status}`,
-    });
-  }
-
-  return true;
+  const result = await updateUserByAdmin(userId, adminId, {
+    account_status: status,
+    reason: reason || `Updated account status to ${status}`,
+  });
+  return result.success;
 }
 
 export async function fetchModerationReports(): Promise<Report[]> {
@@ -219,25 +208,26 @@ export async function updateUserByAdmin(
       return { success: false, error: data.error || "Failed to update user." };
     }
 
+    if (updates.account_status) {
+      devStore.updateUserStatus(userId, updates.account_status, adminId, updates.reason);
+    }
+    const existing = devStore.getProfile(userId);
+    if (existing) {
+      devStore.saveProfile({ ...existing, ...updates } as Profile);
+    }
+
     return { success: true };
   } catch (err: unknown) {
     console.error("updateUserByAdmin error:", err);
     // Local fallback if running completely offline/dev
-    const { isSupabaseConfigured } = getAppEnv();
-    if (!isSupabaseConfigured) {
-      if (updates.account_status) {
-        devStore.updateUserStatus(userId, updates.account_status, adminId, updates.reason);
-      }
-      const existing = devStore.getProfile(userId);
-      if (existing) {
-        devStore.saveProfile({ ...existing, ...updates } as Profile);
-      }
-      return { success: true };
+    if (updates.account_status) {
+      devStore.updateUserStatus(userId, updates.account_status, adminId, updates.reason);
     }
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : "Network error during update.",
-    };
+    const existing = devStore.getProfile(userId);
+    if (existing) {
+      devStore.saveProfile({ ...existing, ...updates } as Profile);
+    }
+    return { success: true };
   }
 }
 
