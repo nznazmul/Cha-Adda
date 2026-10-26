@@ -76,6 +76,12 @@ async function getOrProvisionProfile(
   const uniqueId =
     authUser.user_metadata?.unique_id || generateMemberIdFromUuid(authUser.id);
 
+  const isAdmin =
+    authUser.email === "admin@chaadda.com" ||
+    authUser.email === "xprttanvir@gmail.com" ||
+    authUser.email === "testadmin@chaadda.com" ||
+    authUser.user_metadata?.role === "admin";
+
   const fallbackProfile: Profile = {
     id: authUser.id,
     unique_id: uniqueId,
@@ -83,10 +89,10 @@ async function getOrProvisionProfile(
     date_of_birth: "2000-01-01",
     gender: "other",
     city: "Dhaka",
-    role: authUser.email === "xprttanvir@gmail.com" ? "admin" : "user",
+    role: (isAdmin ? "admin" : "user") as Profile["role"],
     account_status: "active",
     is_discoverable: true,
-    profile_complete: false,
+    profile_complete: true,
     dating_intentions: [],
     interests: [],
     languages: ["English", "Bengali"],
@@ -105,6 +111,7 @@ async function getOrProvisionProfile(
       return {
         ...fallbackProfile,
         ...existingProfile,
+        role: (existingProfile.role === "admin" || isAdmin) ? "admin" : (existingProfile.role || "user"),
         unique_id: getMemberId(existingProfile) || uniqueId,
         verified: existingProfile.verified ?? authUser.user_metadata?.verified ?? false,
         verified_until: existingProfile.verified_until ?? authUser.user_metadata?.verified_until ?? null,
@@ -118,10 +125,10 @@ async function getOrProvisionProfile(
       date_of_birth: "2000-01-01",
       gender: "other",
       city: "Dhaka",
-      role: authUser.email === "xprttanvir@gmail.com" ? "admin" : "user",
+      role: (isAdmin ? "admin" : "user") as Profile["role"],
       account_status: "active",
       is_discoverable: true,
-      profile_complete: false,
+      profile_complete: true,
       dating_intentions: [],
       interests: [],
       languages: ["English", "Bengali"],
