@@ -48,6 +48,18 @@ export async function fetchAdminMetrics(): Promise<AdminAnalyticsMetrics> {
 }
 
 export async function fetchAdminUsers(): Promise<Profile[]> {
+  try {
+    const res = await fetch("/api/admin/users");
+    if (res.ok) {
+      const json = await res.json();
+      if (Array.isArray(json.users)) {
+        return json.users;
+      }
+    }
+  } catch (err) {
+    console.warn("fetchAdminUsers API call fallback:", err);
+  }
+
   const { isSupabaseConfigured } = getAppEnv();
 
   if (!isSupabaseConfigured) {
@@ -190,6 +202,8 @@ export async function updateUserByAdmin(
     gender?: Profile["gender"];
     role?: Profile["role"];
     account_status?: Profile["account_status"];
+    verified?: boolean;
+    verified_until?: string | null;
     reason?: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
@@ -225,4 +239,20 @@ export async function updateUserByAdmin(
       error: err instanceof Error ? err.message : "Network error during update.",
     };
   }
+}
+
+export async function setUserVerification(
+  userId: string,
+  adminId: string,
+  verified: boolean,
+  verified_until: string | null,
+  reason?: string
+): Promise<{ success: boolean; error?: string }> {
+  return updateUserByAdmin(userId, adminId, {
+    verified,
+    verified_until,
+    reason:
+      reason ||
+      `Admin updated Blue Tick (verified: ${verified}, until: ${verified_until || "lifetime"})`,
+  });
 }

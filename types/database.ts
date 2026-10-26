@@ -39,6 +39,7 @@ export interface Profile {
   languages: string[];
   prompts?: ProfilePrompt[];
   verified?: boolean;
+  verified_until?: string | null;
   is_discoverable: boolean;
   profile_complete: boolean;
   account_status: AccountStatus;
@@ -70,6 +71,7 @@ export interface PublicProfile {
   languages: string[];
   prompts?: ProfilePrompt[];
   verified?: boolean;
+  verified_until?: string | null;
   photos: ProfilePhoto[];
   primary_photo_url?: string;
 }

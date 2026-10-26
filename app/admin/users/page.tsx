@@ -17,13 +17,19 @@ import {
   AlertTriangle,
   Clock,
   Sparkles,
-  MapPin,
   Calendar
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
-import { fetchAdminUsers, updateUserByAdmin, setAccountStatus } from "@/lib/services/admin-service";
+import { fetchAdminUsers, updateUserByAdmin, setAccountStatus, setUserVerification } from "@/lib/services/admin-service";
 import { Profile } from "@/types/database";
-import { calculateAge, formatDate } from "@/lib/utils";
+import { calculateAge } from "@/lib/utils";
+import {
+  isProfileVerified,
+  getVerificationDetails,
+  calculateVerificationExpiry,
+  VerificationDurationPreset,
+} from "@/lib/utils/verification";
+import { BlueTickBadge } from "@/components/ui/blue-tick-badge";
 
 export default function AdminUsersPage() {
   const { user: currentAdmin } = useAuth();
@@ -52,6 +58,82 @@ export default function AdminUsersPage() {
     reason: "",
   });
   const [isSaving, setIsSaving] = useState(false);
+
+  // Dedicated Blue Tick Management Modal State
+  const [blueTickUser, setBlueTickUser] = useState<Profile | null>(null);
+  const [blueTickPreset, setBlueTickPreset] = useState<VerificationDurationPreset | "revoke">("1_month");
+  const [blueTickReason, setBlueTickReason] = useState("");
+  const [isUpdatingBlueTick, setIsUpdatingBlueTick] = useState(false);
+
+  const openBlueTickModal = (u: Profile) => {
+    setBlueTickUser(u);
+    setBlueTickReason("");
+    if (!isProfileVerified(u)) {
+      setBlueTickPreset("1_month");
+    } else if (!u.verified_until) {
+      setBlueTickPreset("lifetime");
+    } else {
+      setBlueTickPreset("1_month");
+    }
+  };
+
+  const closeBlueTickModal = () => {
+    setBlueTickUser(null);
+    setIsUpdatingBlueTick(false);
+  };
+
+  const handleSaveBlueTick = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!blueTickUser || !currentAdmin) return;
+
+    setIsUpdatingBlueTick(true);
+    try {
+      const isRevoke = blueTickPreset === "revoke";
+      const verified = !isRevoke;
+      const verified_until = isRevoke ? null : calculateVerificationExpiry(blueTickPreset);
+
+      const res = await setUserVerification(
+        blueTickUser.id,
+        currentAdmin.id,
+        verified,
+        verified_until,
+        blueTickReason.trim() || undefined
+      );
+
+      if (res.success) {
+        const durationLabels: Record<string, string> = {
+          "1_month": "১ মাস (1 Month)",
+          "2_months": "২ মাস (2 Months)",
+          "3_months": "৩ মাস (3 Months)",
+          "6_months": "৬ মাস (6 Months)",
+          "1_year": "১ বছর (1 Year)",
+          "lifetime": "আজীবন / স্থায়ী (Lifetime)",
+          "revoke": "বাতিল (Revoked)",
+        };
+        setActionNotice({
+          text: isRevoke
+            ? `"${blueTickUser.display_name}"-এর ব্লু টিক সফলভাবে বাতিল করা হয়েছে।`
+            : `"${blueTickUser.display_name}"-কে ব্লু টিক দেওয়া হয়েছে (${durationLabels[blueTickPreset] || blueTickPreset})।`,
+          type: "success",
+        });
+        closeBlueTickModal();
+        await loadData();
+      } else {
+        setActionNotice({
+          text: res.error || "ব্লু টিক আপডেট করতে সমস্যা হয়েছে।",
+          type: "error",
+        });
+      }
+    } catch (err: unknown) {
+      setActionNotice({
+        text: err instanceof Error ? err.message : "Error saving verification.",
+        type: "error",
+      });
+    } finally {
+      setIsUpdatingBlueTick(false);
+      setTimeout(() => setActionNotice(null), 4000);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -270,12 +352,30 @@ export default function AdminUsersPage() {
                       {u.display_name.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <Link href={`/profile/${u.id}`} className="font-bold text-sm hover:text-primary">
-                        {u.display_name}
-                      </Link>
-                      <p className="text-[11px] text-muted-foreground">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Link href={`/profile/${u.id}`} className="font-bold text-sm hover:text-primary">
+                          {u.display_name}
+                        </Link>
+                        <BlueTickBadge profile={u} size="sm" />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
                         {age} yrs • {u.gender} • {u.city}
                       </p>
+                      <div className="mt-1">
+                        {isProfileVerified(u) ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-sky-400 font-bold bg-sky-500/10 px-2 py-0.5 rounded-full border border-sky-500/20">
+                            Blue Tick: {getVerificationDetails(u).badgeTextBengali}
+                          </span>
+                        ) : getVerificationDetails(u).isExpired ? (
+                          <span className="inline-flex text-[10px] text-amber-400 font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                            মেয়াদ শেষ (Expired)
+                          </span>
+                        ) : (
+                          <span className="inline-flex text-[10px] text-muted-foreground bg-secondary/80 px-2 py-0.5 rounded-full">
+                            ব্লু টিক নেই
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -306,15 +406,24 @@ export default function AdminUsersPage() {
                   </div>
                 </div>
 
-                {/* Edit Button with Pen Icon */}
-                <div className="pt-2 border-t border-border/60 flex items-center justify-between">
-                  <button
-                    onClick={() => openEditModal(u)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 text-white text-xs font-bold shadow-sm shadow-rose-500/25 hover:scale-[1.02] active:scale-95 transition-all"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    <span>Edit User & Role</span>
-                  </button>
+                {/* Action Buttons */}
+                <div className="pt-2 border-t border-border/60 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => openEditModal(u)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 text-white text-xs font-bold shadow-sm shadow-rose-500/25 hover:scale-[1.02] active:scale-95 transition-all"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      onClick={() => openBlueTickModal(u)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-400 hover:bg-sky-500 hover:text-white text-xs font-bold transition-all shadow-xs active:scale-95"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      <span>Blue Tick</span>
+                    </button>
+                  </div>
 
                   <div className="flex items-center gap-1.5">
                     {u.account_status !== "active" ? (
@@ -357,6 +466,7 @@ export default function AdminUsersPage() {
                 <th className="p-4 pl-6">Member</th>
                 <th className="p-4">Age / Gender</th>
                 <th className="p-4">Location</th>
+                <th className="p-4">Blue Tick</th>
                 <th className="p-4">Status</th>
                 <th className="p-4">Role</th>
                 <th className="p-4 pr-6 text-right">Admin Actions</th>
@@ -365,13 +475,13 @@ export default function AdminUsersPage() {
             <tbody className="divide-y divide-border/60">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
                     Loading users...
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
                     No users matching criteria.
                   </td>
                 </tr>
@@ -402,6 +512,24 @@ export default function AdminUsersPage() {
                         {u.city || "Dhaka"}
                       </td>
                       <td className="p-4 whitespace-nowrap">
+                        {isProfileVerified(u) ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 font-bold text-[11px]">
+                            <span className="h-3.5 w-3.5 rounded-full bg-sky-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                              <Check className="h-2 w-2 stroke-[3.5]" />
+                            </span>
+                            <span>{getVerificationDetails(u).badgeTextBengali}</span>
+                          </div>
+                        ) : getVerificationDetails(u).isExpired ? (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            মেয়াদ শেষ
+                          </span>
+                        ) : (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium text-muted-foreground bg-secondary/60">
+                            ব্লু টিক নেই
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 whitespace-nowrap">
                         <span
                           className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-extrabold capitalize ${
                             u.account_status === "active"
@@ -428,7 +556,17 @@ export default function AdminUsersPage() {
                         </span>
                       </td>
                       <td className="p-4 pr-6 text-right whitespace-nowrap">
-                        <div className="inline-flex items-center gap-2">
+                        <div className="inline-flex items-center gap-1.5">
+                          {/* Dedicated Blue Tick Button */}
+                          <button
+                            onClick={() => openBlueTickModal(u)}
+                            title="Manage Blue Tick duration & status"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-400 hover:bg-sky-500 hover:text-white transition-all text-xs font-bold shadow-xs active:scale-95"
+                          >
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                            <span>Blue Tick</span>
+                          </button>
+
                           {/* Pen / Edit Icon Button */}
                           <button
                             onClick={() => openEditModal(u)}
@@ -653,6 +791,168 @@ export default function AdminUsersPage() {
                     <>
                       <Check className="h-4 w-4" />
                       <span>Save Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Dedicated Blue Tick Duration Modal */}
+      {blueTickUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div
+            className="relative w-full max-w-lg rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-start justify-between border-b border-border/80 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-400 font-bold border border-sky-500/30 shrink-0">
+                  <ShieldCheck className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <h2 className="text-base font-black tracking-tight">
+                      Blue Tick (ব্লু টিক ভেরিফিকেশন)
+                    </h2>
+                    <BlueTickBadge profile={blueTickUser} size="sm" />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Member: <span className="font-bold text-foreground">{blueTickUser.display_name}</span> ({blueTickUser.id.slice(0, 8)}...)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeBlueTickModal}
+                disabled={isUpdatingBlueTick}
+                className="rounded-xl p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                aria-label="Close modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Current Status Box */}
+            <div className="rounded-2xl bg-secondary/50 border border-border p-3 flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">বর্তমান স্ট্যাটাস:</span>
+              {isProfileVerified(blueTickUser) ? (
+                <span className="inline-flex items-center gap-1 font-bold text-sky-400">
+                  <Check className="h-3.5 w-3.5" />
+                  <span>সক্রিয় ({getVerificationDetails(blueTickUser).formattedExpiry})</span>
+                </span>
+              ) : getVerificationDetails(blueTickUser).isExpired ? (
+                <span className="font-bold text-amber-400">মেয়াদ শেষ (Expired)</span>
+              ) : (
+                <span className="font-medium text-muted-foreground">ব্লু টিক দেওয়া হয়নি</span>
+              )}
+            </div>
+
+            <form onSubmit={handleSaveBlueTick} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-foreground mb-2">
+                  ব্লু টিক প্রদর্শনের মেয়াদ নির্ধারণ করুন (Facebook / Tinder Style):
+                </label>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { id: "1_month", label: "১ মাস (1 Month)", desc: "৩০ দিন সক্রিয়", days: 30 },
+                    { id: "2_months", label: "২ মাস (2 Months)", desc: "৬০ দিন সক্রিয়", days: 60 },
+                    { id: "3_months", label: "৩ মাস (3 Months)", desc: "৯০ দিন সক্রিয়", days: 90 },
+                    { id: "6_months", label: "৬ মাস (6 Months)", desc: "১৮০ দিন সক্রিয়", days: 180 },
+                    { id: "1_year", label: "১ বছর (1 Year)", desc: "৩৬৫ দিন সক্রিয়", days: 365 },
+                    { id: "lifetime", label: "আজীবন / স্থায়ী", desc: "কোনো মেয়াদ শেষ হবে না", days: Infinity },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setBlueTickPreset(opt.id as VerificationDurationPreset)}
+                      className={`p-3 rounded-2xl border text-left transition-all flex flex-col gap-0.5 ${
+                        blueTickPreset === opt.id
+                          ? "border-sky-500 bg-sky-500/15 shadow-sm ring-1 ring-sky-500/30"
+                          : "border-border bg-card hover:bg-secondary/60"
+                      }`}
+                    >
+                      <span className={`text-xs font-bold ${blueTickPreset === opt.id ? "text-sky-400" : "text-foreground"}`}>
+                        {opt.label}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">{opt.desc}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Revoke Option */}
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setBlueTickPreset("revoke")}
+                    className={`w-full p-2.5 rounded-2xl border text-center transition-all text-xs font-bold ${
+                      blueTickPreset === "revoke"
+                        ? "border-destructive bg-destructive/15 text-destructive ring-1 ring-destructive/30"
+                        : "border-border/80 bg-secondary/30 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    }`}
+                  >
+                    🚫 ব্লু টিক বাতিল / রিমুভ করুন (Revoke Blue Tick)
+                  </button>
+                </div>
+              </div>
+
+              {/* Expiry Preview */}
+              {blueTickPreset !== "revoke" && (
+                <div className="rounded-xl bg-sky-500/10 border border-sky-500/20 p-2.5 text-xs text-sky-400 flex items-center justify-between">
+                  <span>নতুন মেয়াদ শেষ হবে:</span>
+                  <span className="font-bold">
+                    {blueTickPreset === "lifetime"
+                      ? "স্থায়ী (Lifetime • No Expiration)"
+                      : new Date(calculateVerificationExpiry(blueTickPreset) || "").toLocaleDateString("bn-BD", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                  </span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground mb-1">
+                  অ্যাডমিন নোট / কারণ (Audit Trail)
+                </label>
+                <input
+                  type="text"
+                  value={blueTickReason}
+                  onChange={(e) => setBlueTickReason(e.target.value)}
+                  placeholder="e.g. সেলফি যাচাই সম্পন্ন / VIP সাবস্ক্রিপশন ব্লু টিক অনুমোদন"
+                  className="w-full rounded-xl border border-border bg-card px-3.5 py-2 text-xs focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-border flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={closeBlueTickModal}
+                  disabled={isUpdatingBlueTick}
+                  className="px-4 py-2 rounded-xl border border-border text-xs font-semibold hover:bg-secondary transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingBlueTick}
+                  className={`inline-flex items-center gap-1.5 px-6 py-2 rounded-xl text-white text-xs font-bold shadow-md transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 ${
+                    blueTickPreset === "revoke"
+                      ? "bg-destructive hover:bg-destructive/90"
+                      : "bg-sky-500 hover:bg-sky-600 shadow-sky-500/25"
+                  }`}
+                >
+                  {isUpdatingBlueTick ? (
+                    <span>আপডেট হচ্ছে...</span>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" />
+                      <span>{blueTickPreset === "revoke" ? "ব্লু টিক বাতিল করুন" : "ব্লু টিক নিশ্চিত করুন"}</span>
                     </>
                   )}
                 </button>

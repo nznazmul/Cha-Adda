@@ -27,6 +27,7 @@ import { fetchDiscoveryCandidates, submitSwipe, searchMembers } from "@/lib/serv
 import { PublicProfile } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { getMemberId } from "@/lib/utils/member-id";
+import { BlueTickBadge } from "@/components/ui/blue-tick-badge";
 
 const POPULAR_VENUES = [
   "☕ ধানমন্ডি রবীন্দ্র সরোবর",
@@ -501,7 +502,7 @@ export default function DiscoverPage() {
                 <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                   {currentCandidate.display_name}, {currentCandidate.age}
                 </h2>
-                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                <BlueTickBadge profile={currentCandidate} size="lg" />
                 <span className="rounded-full bg-rose-500/80 border border-white/20 px-2 py-0.5 text-[10px] font-bold text-white tracking-wide shadow-sm">
                   ID: {getMemberId(currentCandidate)}
                 </span>
@@ -627,7 +628,7 @@ export default function DiscoverPage() {
                     <h2 className="text-2xl font-black">
                       {inspectProfile.display_name}, {inspectProfile.age}
                     </h2>
-                    <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                    <BlueTickBadge profile={inspectProfile} size="lg" />
                     <span className="rounded-full bg-rose-500/90 border border-white/20 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm">
                       ID: {getMemberId(inspectProfile)}
                     </span>

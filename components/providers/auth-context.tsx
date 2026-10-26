@@ -106,6 +106,8 @@ async function getOrProvisionProfile(
         ...fallbackProfile,
         ...existingProfile,
         unique_id: getMemberId(existingProfile) || uniqueId,
+        verified: existingProfile.verified ?? authUser.user_metadata?.verified ?? false,
+        verified_until: existingProfile.verified_until ?? authUser.user_metadata?.verified_until ?? null,
       } as Profile;
     }
 
@@ -306,13 +308,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } = await supabase.auth.getUser();
 
         if (authUser) {
+          // If verification state changed, save to auth user_metadata
+          if (updates.verified !== undefined || updates.verified_until !== undefined) {
+            try {
+              await supabase.auth.updateUser({
+                data: {
+                  verified: updates.verified !== undefined ? updates.verified : user?.verified,
+                  verified_until:
+                    updates.verified_until !== undefined ? updates.verified_until : user?.verified_until,
+                },
+              });
+            } catch (authErr) {
+              console.warn("Could not sync verification to auth metadata:", authErr);
+            }
+          }
+
+          const { verified: _v, verified_until: _vu, ...dbFields } = updates;
+          void _v;
+          void _vu;
           const profilePayload = {
             id: authUser.id,
             display_name: updates.display_name || user?.display_name || "New Member",
             date_of_birth: updates.date_of_birth || user?.date_of_birth || "2000-01-01",
             gender: updates.gender || user?.gender || "other",
             city: updates.city || user?.city || "Dhaka",
-            ...updates,
+            ...dbFields,
             updated_at: new Date().toISOString(),
           };
 
@@ -323,7 +343,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .maybeSingle();
 
           if (!error && savedProfile) {
-            setUser(savedProfile as Profile);
+            setUser({
+              ...(savedProfile as Profile),
+              verified: updates.verified !== undefined ? updates.verified : user?.verified,
+              verified_until:
+                updates.verified_until !== undefined ? updates.verified_until : user?.verified_until,
+            });
           } else if (error) {
             console.error("Supabase profile save error:", error);
           }

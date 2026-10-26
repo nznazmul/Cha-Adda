@@ -348,7 +348,8 @@ class DevDataStore {
         { id: "pr-2", question: "যে বিষয়ে আমার সাথে ঘণ্টার পর ঘণ্টা তর্ক করা যাবে...", answer: "চা নাকি কফি, আর প্রিয় ভ্রমণ স্মৃতি নিয়ে!" },
         { id: "pr-3", question: "আমার প্রিয় মিষ্টি বা স্ন্যাক্স...", answer: "চায়ের সাথে মুচমুচে গরম সিঙ্গাড়া অথবা বাকরখানি।" },
       ],
-      verified: profile.verified ?? true,
+      verified: profile.verified ?? false,
+      verified_until: profile.verified_until || null,
       photos: userPhotos,
       primary_photo_url: primary ? primary.url : undefined,
     };

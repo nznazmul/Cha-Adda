@@ -19,6 +19,7 @@ import { blockMember } from "@/lib/services/safety-service";
 import { submitSwipe } from "@/lib/services/matching-service";
 import { PublicProfile } from "@/types/database";
 import { getMemberId } from "@/lib/utils/member-id";
+import { BlueTickBadge } from "@/components/ui/blue-tick-badge";
 
 function PublicProfileViewContent() {
   const params = useParams();
@@ -120,6 +121,7 @@ function PublicProfileViewContent() {
           <div className="absolute bottom-4 left-4 right-4 text-white">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-black">{profile.display_name}, {profile.age}</h1>
+              <BlueTickBadge profile={profile} size="lg" />
               <span className="rounded-full bg-rose-500/90 border border-white/20 px-2 py-0.5 text-[10px] font-bold text-white tracking-wide shadow-sm">
                 ID: {getMemberId(profile)}
               </span>

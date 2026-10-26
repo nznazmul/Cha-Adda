@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { getMemberId } from "@/lib/utils/member-id";
+import { isProfileVerified, getVerificationDetails, calculateVerificationExpiry } from "@/lib/utils/verification";
+import { BlueTickBadge } from "@/components/ui/blue-tick-badge";
 
 export default function ProfilePage() {
   const { user, updateCurrentProfile } = useAuth();
@@ -57,6 +59,8 @@ export default function ProfilePage() {
   }
 
   const memberId = getMemberId(user);
+  const hasBlueTick = isProfileVerified(user);
+  const verificationDetails = getVerificationDetails(user);
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(memberId);
@@ -82,7 +86,8 @@ export default function ProfilePage() {
     setTimeout(() => {
       setVerifying(false);
       setVerifiedSuccess(true);
-      updateCurrentProfile({ verified: true });
+      const expiry = calculateVerificationExpiry("1_month");
+      updateCurrentProfile({ verified: true, verified_until: expiry });
       try {
         confetti({
           particleCount: 100,
@@ -120,9 +125,7 @@ export default function ProfilePage() {
             <div>
               <div className="flex items-center justify-center sm:justify-start gap-2">
                 <h1 className="text-2xl font-black">{user.display_name}, {age}</h1>
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white" title="Verified Member">
-                  <Check className="h-3 w-3 stroke-[3]" />
-                </span>
+                <BlueTickBadge profile={user} size="lg" />
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {user.city} • {user.gender}
@@ -171,20 +174,58 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Selfie Verification Trigger Bar */}
-        <div className="mt-6 flex items-center justify-between p-3 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-xs">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-sky-400" />
-            <span className="font-semibold text-foreground">সেলফি ভেরিফিকেশন (Blue Tick)</span>
+        {/* Conditional Verification Bar:
+            - If user already has active Blue Tick: AUTO VANISH the "সেলফি ভেরিফিকেশন (Blue Tick)" text and button!
+              Instead show the official active verified badge with expiry duration details.
+            - If not verified (or expired): show the selfie verification prompt so user can verify.
+        */}
+        {hasBlueTick ? (
+          <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/30 text-xs shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500 text-white shadow-md shadow-sky-500/20 shrink-0">
+                <Check className="h-4 w-4 stroke-[3]" />
+              </span>
+              <div>
+                <div className="flex items-center gap-1.5 font-bold text-sky-400">
+                  <span>অফিশিয়াল ব্লু টিক সক্রিয়</span>
+                  <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] text-sky-300 font-mono">
+                    {verificationDetails.badgeTextBengali}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  আপনার প্রোফাইলটি সফলভাবে যাচাইকৃত ও বিশ্বস্ত • মেয়াদ: {verificationDetails.formattedExpiry}
+                </p>
+              </div>
+            </div>
+            <div className="self-end sm:self-center">
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-400 bg-sky-500/15 px-2.5 py-1 rounded-full border border-sky-500/25">
+                <ShieldCheck className="h-3 w-3" />
+                <span>Verified</span>
+              </span>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowVerificationModal(true)}
-            className="px-3 py-1 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-[11px] transition-colors"
-          >
-            ভেরিফাই করুন 🛡️
-          </button>
-        </div>
+        ) : (
+          <div className="mt-6 flex items-center justify-between p-3 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-xs">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-sky-400" />
+              <div>
+                <span className="font-semibold text-foreground block">সেলফি ভেরিফিকেশন (Blue Tick)</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {verificationDetails.isExpired
+                    ? "আপনার আগের ব্লু টিকের মেয়াদ শেষ হয়েছে। পুনরায় যাচাই করুন।"
+                    : "প্রোফাইলে অফিশিয়াল ব্লু টিক ব্যাজ পান"}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowVerificationModal(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-[11px] transition-colors shadow-sm shrink-0"
+            >
+              ভেরিফাই করুন 🛡️
+            </button>
+          </div>
+        )}
 
         {savedNotice && (
           <div className="mt-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-2 text-center text-xs text-emerald-400 font-semibold">
