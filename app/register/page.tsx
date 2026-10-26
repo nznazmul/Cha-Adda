@@ -4,15 +4,38 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Mail, Lock, AlertCircle, ArrowRight, Check, User } from "lucide-react";
+import { Mail, Lock, AlertCircle, ArrowRight, Check, User, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/providers/auth-context";
+import { validateAndFormatPhone } from "@/lib/utils/phone";
+
+const COUNTRY_CODES = [
+  { code: "+880", flag: "🇧🇩", name: "Bangladesh" },
+  { code: "+1", flag: "🇺🇸", name: "USA / Canada" },
+  { code: "+44", flag: "🇬🇧", name: "UK" },
+  { code: "+971", flag: "🇦🇪", name: "UAE" },
+  { code: "+966", flag: "🇸🇦", name: "Saudi Arabia" },
+  { code: "+91", flag: "🇮🇳", name: "India" },
+  { code: "+60", flag: "🇲🇾", name: "Malaysia" },
+  { code: "+65", flag: "🇸🇬", name: "Singapore" },
+  { code: "+974", flag: "🇶🇦", name: "Qatar" },
+  { code: "+965", flag: "🇰🇼", name: "Kuwait" },
+  { code: "+968", flag: "🇴🇲", name: "Oman" },
+  { code: "+61", flag: "🇦🇺", name: "Australia" },
+  { code: "+39", flag: "🇮🇹", name: "Italy" },
+  { code: "+49", flag: "🇩🇪", name: "Germany" },
+  { code: "+33", flag: "🇫🇷", name: "France" },
+  { code: "+81", flag: "🇯🇵", name: "Japan" },
+  { code: "+82", flag: "🇰🇷", name: "South Korea" },
+];
 
 export default function RegisterPage() {
   const router = useRouter();
   const { refreshAuth } = useAuth();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
+  const [countryCode, setCountryCode] = useState("+880");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isAdult, setIsAdult] = useState(false);
@@ -29,6 +52,12 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    const phoneResult = validateAndFormatPhone(phone, countryCode);
+    if (!phoneResult.isValid) {
+      setError(phoneResult.error || "সঠিক মোবাইল নম্বর দিন।");
+      return;
+    }
 
     if (!isAdult) {
       setError("You must be at least 18 years old to join CHA ADDA.");
@@ -56,7 +85,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, displayName }),
+        body: JSON.stringify({ email, password, displayName, phone, countryCode }),
       });
 
       const resData = await res.json();
@@ -152,6 +181,56 @@ export default function RegisterPage() {
                 className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center justify-between">
+              <span>
+                Mobile Number <span className="text-rose-500">*</span>
+              </span>
+              <span className="text-[11px] text-muted-foreground font-normal">
+                {countryCode === "+880" ? "১১ ডিজিট (যেমন 017...)" : "Country code + number"}
+              </span>
+            </label>
+            <div className="flex gap-2">
+              {/* Country Code Picker */}
+              <div className="relative w-36 shrink-0">
+                <select
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value)}
+                  className="w-full h-[42px] appearance-none rounded-xl border border-border bg-background py-2 pl-3 pr-7 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors cursor-pointer"
+                >
+                  {COUNTRY_CODES.map((c) => (
+                    <option key={c.code} value={c.code} className="bg-background text-foreground">
+                      {c.flag} {c.code} ({c.name})
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-muted-foreground text-[10px]">
+                  ▼
+                </div>
+              </div>
+
+              {/* Phone Input */}
+              <div className="relative flex-1">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted-foreground">
+                  <Phone className="h-4 w-4" />
+                </div>
+                <input
+                  type="tel"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder={countryCode === "+880" ? "01712345678" : "Phone number"}
+                  className="w-full h-[42px] rounded-xl border border-border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                />
+              </div>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {countryCode === "+880"
+                ? "বাংলাদেশী নম্বর (১১ ডিজিট, 013-019 সিরিজ)"
+                : "Enter your active international mobile number"}
+            </p>
           </div>
 
           <div>

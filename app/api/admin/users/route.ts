@@ -59,13 +59,19 @@ export async function GET(request: Request) {
       return NextResponse.json({ users: devStore.getAllProfiles() });
     }
 
-    // Fetch auth metadata to merge verified & verified_until
-    let authUserMap = new Map<string, Record<string, unknown>>();
+    // Fetch auth metadata to merge verified, verified_until & phone
+    let authUserMap = new Map<string, { meta: Record<string, unknown>; phone?: string | null }>();
     try {
-      const { data: authUsersData } = await adminClient.auth.admin.listUsers();
+      const { data: authUsersData } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
       if (authUsersData?.users) {
         authUserMap = new Map(
-          authUsersData.users.map((u) => [u.id, (u.user_metadata as Record<string, unknown>) || {}])
+          authUsersData.users.map((u) => [
+            u.id,
+            {
+              meta: (u.user_metadata as Record<string, unknown>) || {},
+              phone: u.phone || (u.user_metadata?.phone as string | undefined) || null,
+            },
+          ])
         );
       }
     } catch (authErr) {
@@ -73,9 +79,11 @@ export async function GET(request: Request) {
     }
 
     const enrichedProfiles: Profile[] = (profiles || []).map((p) => {
-      const meta = authUserMap.get(p.id) || {};
+      const authInfo = authUserMap.get(p.id);
+      const meta = authInfo?.meta || {};
       return {
         ...p,
+        phone: p.phone || authInfo?.phone || (meta.phone as string | undefined) || null,
         verified: p.verified ?? (meta.verified as boolean | undefined) ?? false,
         verified_until:
           p.verified_until ?? (meta.verified_until as string | null | undefined) ?? null,

@@ -9,6 +9,7 @@ import { fetchIncomingLikes, submitSwipe, ensureUserMatch } from "@/lib/services
 import { PublicProfile } from "@/types/database";
 import { BlueTickBadge } from "@/components/ui/blue-tick-badge";
 import { devStore } from "@/lib/services/dev-store";
+import { useAuth } from "@/components/providers/auth-context";
 
 export default function LikesPage() {
   const router = useRouter();

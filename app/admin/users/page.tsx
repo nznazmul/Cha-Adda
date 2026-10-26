@@ -267,6 +267,7 @@ export default function AdminUsersPage() {
     const matchesSearch =
       u.display_name.toLowerCase().includes(search.toLowerCase()) ||
       u.city.toLowerCase().includes(search.toLowerCase()) ||
+      (u.phone || "").toLowerCase().includes(search.toLowerCase()) ||
       u.id.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || u.account_status === statusFilter;
     const matchesRole = roleFilter === "all" || u.role === roleFilter;
@@ -429,7 +430,7 @@ export default function AdminUsersPage() {
                         <BlueTickBadge profile={u} size="sm" />
                       </div>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {age} yrs • {u.gender} • {u.city}
+                        {age} yrs • {u.gender} • {u.city} {u.phone ? `• 📱 ${u.phone}` : ""}
                       </p>
                       <div className="mt-1">
                         {isProfileVerified(u) ? (
@@ -598,9 +599,14 @@ export default function AdminUsersPage() {
                             <Link href={`/profile/${u.id}`} className="hover:text-primary transition-colors block">
                               {u.display_name}
                             </Link>
-                            <span className="text-[10px] text-muted-foreground font-mono">
-                              {u.id.slice(0, 8)}...
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-muted-foreground font-mono">
+                              {u.phone ? (
+                                <span className="font-sans font-semibold text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded">
+                                  📱 {u.phone}
+                                </span>
+                              ) : null}
+                              <span>ID: {u.id.slice(0, 8)}...</span>
+                            </div>
                           </div>
                         </div>
                       </td>

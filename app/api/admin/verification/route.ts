@@ -3,6 +3,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { getAppEnv } from "@/lib/config/env";
 import { devStore } from "@/lib/services/dev-store";
 import { calculateVerificationExpiry, VerificationDurationPreset } from "@/lib/utils/verification";
+import { VerificationRequest } from "@/types/database";
 
 export async function GET(request: Request) {
   try {
@@ -72,7 +73,7 @@ export async function GET(request: Request) {
 
         const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
-        const auditRequests = logs.map((log) => {
+        const auditRequests: VerificationRequest[] = logs.map((log) => {
           const meta = (log.metadata || {}) as Record<string, unknown>;
           const uId = String(meta.userId || log.admin_id);
           const p = profileMap.get(uId);
@@ -81,8 +82,11 @@ export async function GET(request: Request) {
             user_id: uId,
             selfie_url: String(meta.selfieUrl || ""),
             status: String(meta.status || "pending") as "pending" | "approved" | "rejected",
-            created_at: log.created_at,
-            updated_at: log.created_at,
+            submitted_at: log.created_at,
+            reviewed_at: (meta.reviewedAt as string | null) || null,
+            reviewed_by: (meta.reviewedBy as string | null) || null,
+            rejection_reason: (meta.rejectionReason as string | null) || null,
+            duration_preset: (meta.durationPreset as string | null) || null,
             user: p ? {
               id: p.id,
               display_name: p.display_name,
@@ -95,7 +99,7 @@ export async function GET(request: Request) {
 
         // Merge with seed devStore requests
         const devRequests = devStore.getVerificationRequests();
-        const combined = [...auditRequests];
+        const combined: VerificationRequest[] = [...auditRequests];
         for (const dr of devRequests) {
           if (!combined.some((r) => r.id === dr.id)) {
             combined.push(dr);

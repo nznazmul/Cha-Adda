@@ -25,6 +25,7 @@ import { PublicProfile, Profile } from "@/types/database";
 import { getMemberId } from "@/lib/utils/member-id";
 import { calculateAge } from "@/lib/utils";
 import { BlueTickBadge } from "@/components/ui/blue-tick-badge";
+import { blockMember } from "@/lib/services/safety-service";
 
 function getCachedAuthUser(): Profile | null {
   if (typeof window === "undefined") return null;

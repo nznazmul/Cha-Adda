@@ -90,6 +90,7 @@ async function getOrProvisionProfile(
     gender: "other",
     city: "Dhaka",
     role: (isAdmin ? "admin" : "user") as Profile["role"],
+    phone: authUser.phone || authUser.user_metadata?.phone || null,
     account_status: "active",
     is_discoverable: true,
     profile_complete: true,
@@ -113,6 +114,7 @@ async function getOrProvisionProfile(
         ...existingProfile,
         role: (existingProfile.role === "admin" || isAdmin) ? "admin" : (existingProfile.role || "user"),
         unique_id: getMemberId(existingProfile) || uniqueId,
+        phone: existingProfile.phone ?? authUser.phone ?? authUser.user_metadata?.phone ?? null,
         verified: existingProfile.verified ?? authUser.user_metadata?.verified ?? false,
         verified_until: existingProfile.verified_until ?? authUser.user_metadata?.verified_until ?? null,
       } as Profile;
@@ -142,7 +144,9 @@ async function getOrProvisionProfile(
 
     if (inserted) {
       return {
+        ...fallbackProfile,
         ...(inserted as Profile),
+        phone: (inserted as Profile).phone ?? fallbackProfile.phone,
         unique_id: uniqueId,
       };
     }

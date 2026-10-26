@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { getAppEnv } from "@/lib/config/env";
 import { devStore } from "@/lib/services/dev-store";
-import { Message, Match, PublicProfile } from "@/types/database";
+import { Message, Match, PublicProfile, MatchStatus } from "@/types/database";
 import { encryptMessage, decryptMessage } from "@/lib/security/e2ee";
 
 import { calculateAge } from "@/lib/utils";
@@ -90,6 +90,7 @@ export async function fetchMatchDetails(
 
   return {
     ...match,
+    status: (match.status as MatchStatus) || "active",
     other_user: otherUser,
   };
 }
