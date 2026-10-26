@@ -241,3 +241,18 @@ export interface VerificationRequest {
     unique_id?: string | null;
   };
 }
+
+export interface MeetingSpot {
+  id: string;
+  name: string;
+  area: string;
+  city: string;
+  address?: string | null;
+  tip?: string | null;
+  google_maps_url?: string | null;
+  image_url?: string | null;
+  is_active: boolean;
+  display_order?: number;
+  created_at: string;
+  updated_at: string;
+}

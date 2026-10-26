@@ -30,7 +30,8 @@ import {
 } from "@/lib/services/chat-service";
 import { unmatchUser } from "@/lib/services/matching-service";
 import { blockMember } from "@/lib/services/safety-service";
-import { Message, PublicProfile } from "@/types/database";
+import { Message, PublicProfile, MeetingSpot } from "@/types/database";
+import { fetchActiveSpots } from "@/lib/services/meeting-spots-service";
 import { cn, formatDate } from "@/lib/utils";
 import { 
   playVoiceNote, 
@@ -63,6 +64,7 @@ function ChatConversationContent() {
   const [sending, setSending] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showCafePicker, setShowCafePicker] = useState(false);
+  const [availableSpots, setAvailableSpots] = useState<MeetingSpot[]>([]);
   const [confirmUnmatch, setConfirmUnmatch] = useState(false);
 
   // Voice note recording state
@@ -83,6 +85,14 @@ function ChatConversationContent() {
 
   // Stop playback and recording when leaving the chat screen
   useEffect(() => {
+    fetchActiveSpots()
+      .then((spots) => {
+        if (spots && spots.length > 0) {
+          setAvailableSpots(spots);
+        }
+      })
+      .catch((err) => console.warn("Could not load dynamic spots:", err));
+
     return () => {
       stopCurrentVoice();
       if (timerRef.current) clearInterval(timerRef.current);
@@ -300,7 +310,7 @@ function ChatConversationContent() {
     stopPlaybackRef.current = cancel;
   };
 
-  const handleSelectCafe = (cafe: typeof SAFE_CAFES[0]) => {
+  const handleSelectCafe = (cafe: { name: string; area: string; city?: string }) => {
     setInputText(`☕ এক কাপ চমৎকার কফির জন্য "${cafe.name}" (${cafe.area})-এ দেখা করা যায়? আপনি কি ফ্রি আছেন?`);
     setShowCafePicker(false);
   };
@@ -429,16 +439,29 @@ function ChatConversationContent() {
               <X className="h-3 w-3" />
             </button>
           </div>
-          <div className="space-y-1.5 max-h-60 overflow-y-auto">
-            {SAFE_CAFES.map((cafe) => (
+          <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+            {(availableSpots.length > 0 ? availableSpots : SAFE_CAFES).map((cafe) => (
               <button
-                key={cafe.name}
+                key={"id" in cafe ? cafe.id : cafe.name}
                 type="button"
                 onClick={() => handleSelectCafe(cafe)}
-                className="w-full text-left p-2.5 rounded-xl border border-border/80 bg-secondary/40 hover:bg-amber-500/10 hover:border-amber-500/40 transition-colors"
+                className="w-full text-left p-2.5 rounded-xl border border-border/80 bg-secondary/40 hover:bg-amber-500/10 hover:border-amber-500/40 transition-colors group"
               >
-                <div className="font-bold text-xs text-foreground">{cafe.name}</div>
-                <div className="text-[10px] text-muted-foreground">{cafe.area} • {cafe.tip}</div>
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-xs text-foreground group-hover:text-amber-500 transition-colors">
+                    {cafe.name}
+                  </div>
+                  {"city" in cafe && cafe.city ? (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-semibold">
+                      {cafe.city}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                  <MapPin className="h-2.5 w-2.5 text-amber-500 shrink-0" />
+                  <span className="font-medium text-foreground/80">{cafe.area}</span>
+                  {cafe.tip && <span>• {cafe.tip}</span>}
+                </div>
               </button>
             ))}
           </div>

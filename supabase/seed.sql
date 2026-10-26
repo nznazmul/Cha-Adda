@@ -96,4 +96,76 @@ BEGIN
     (v_user4_id, 'dark'),
     (v_admin_id, 'dark')
   ON CONFLICT (user_id) DO NOTHING;
+
+  -- Insert Safe Meeting Spots (নিরাপদ ক্যাফে স্পট)
+  INSERT INTO meeting_spots (name, area, city, address, google_maps_url, safety_tip, image_url, is_active, display_order)
+  VALUES
+    (
+      'North End Coffee Roasters (Banani 11)',
+      'Banani',
+      'Dhaka',
+      'Road 11, Block D, Banani, Dhaka 1213',
+      'https://maps.google.com/?q=North+End+Coffee+Roasters+Banani',
+      'উন্মুক্ত পরিবেশ, ডেডিকেটেড সিকিউরিটি এবং প্রচুর ক্রাউড থাকার কারণে প্রথম সাক্ষাতের জন্য অত্যন্ত নিরাপদ।',
+      'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80',
+      true,
+      1
+    ),
+    (
+      'Gloria Jean''s Coffees (Gulshan-1)',
+      'Gulshan-1',
+      'Dhaka',
+      'Plot 35, Road 24, Navana Tower, Gulshan-1, Dhaka',
+      'https://maps.google.com/?q=Gloria+Jeans+Coffees+Gulshan+1',
+      'মূল সড়কের পাশে, সিসিটিভি সম্বলিত আন্তর্জাতিক ক্যাফে চেইন।',
+      'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=800&q=80',
+      true,
+      2
+    ),
+    (
+      'Crimson Cup (Dhanmondi 27)',
+      'Dhanmondi',
+      'Dhaka',
+      'House 27, Road 27 (Old), Dhanmondi, Dhaka',
+      'https://maps.google.com/?q=Crimson+Cup+Coffee+Dhanmondi',
+      'পর্যাপ্ত আলো ও সেন্ট্রাল ধানমন্ডি লোকেশন। প্রথম মিটের জন্য আদর্শ।',
+      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=800&q=80',
+      true,
+      3
+    ),
+    (
+      'Tabaq Coffee (Jamuna Future Park)',
+      'Bashundhara',
+      'Dhaka',
+      'Level 5, Jamuna Future Park, Kuril, Dhaka',
+      'https://maps.google.com/?q=Jamuna+Future+Park+Dhaka',
+      'বিশাল শপিংমল সিকিউরিটি ও পারিবারিক আবহে স্বাচ্ছন্দ্য বোধ করবেন।',
+      'https://images.unsplash.com/photo-1559925393-8be0ec4767c8?auto=format&fit=crop&w=800&q=80',
+      true,
+      4
+    ),
+    (
+      'The Coffee Bean & Tea Leaf (Uttara)',
+      'Uttara',
+      'Dhaka',
+      'Sector 3, Jasimuddin Avenue, Uttara, Dhaka',
+      'https://maps.google.com/?q=Coffee+Bean+Tea+Leaf+Uttara',
+      'উত্তরা এয়ারপোর্ট রোডের কাছে পরিচ্ছন্ন ও সার্বক্ষণিক পাবলিক স্পেস।',
+      'https://images.unsplash.com/photo-1442512595331-e89e73853f31?auto=format&fit=crop&w=800&q=80',
+      true,
+      5
+    ),
+    (
+      'Ajo Idea Space (Uttara Sector 13)',
+      'Uttara',
+      'Dhaka',
+      'House 28, Gausul Azam Avenue, Sector 13, Uttara, Dhaka',
+      'https://maps.google.com/?q=Ajo+Idea+Space+Uttara',
+      'শান্ত ও নান্দনিক ক্রিয়েটিভ পরিবেশ, চিল আড্ডার জন্য প্রশংসিত।',
+      'https://images.unsplash.com/photo-1447933601403-0c6688de566e?auto=format&fit=crop&w=800&q=80',
+      true,
+      6
+    )
+  ON CONFLICT DO NOTHING;
 END $$;
+

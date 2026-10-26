@@ -4,7 +4,6 @@ import { getAppEnv } from "@/lib/config/env";
 import { devStore } from "@/lib/services/dev-store";
 import { AdminAnalyticsMetrics } from "@/types/database";
 
-export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {

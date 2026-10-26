@@ -1,4 +1,4 @@
-import { Profile, PublicProfile, ProfilePhoto, Swipe, Match, Message, Report, Notification, AdminAuditLog, PlatformSettings, SwipeAction, VerificationRequest } from "@/types/database";
+import { Profile, PublicProfile, ProfilePhoto, Swipe, Match, Message, Report, Notification, AdminAuditLog, PlatformSettings, SwipeAction, VerificationRequest, MeetingSpot } from "@/types/database";
 import { bengaliFemaleProfiles, bengaliFemalePhotos } from "@/lib/data/bengali-bots";
 import { getMemberId, isMatchingMemberId } from "@/lib/utils/member-id";
 import { calculateVerificationExpiry, VerificationDurationPreset } from "@/lib/utils/verification";
@@ -230,6 +230,93 @@ const initialPhotos: Record<string, ProfilePhoto[]> = {
   ]
 };
 
+const initialMeetingSpots: MeetingSpot[] = [
+  {
+    id: "spot-1",
+    name: "North End Coffee Roasters",
+    area: "Banani / Dhanmondi / Gulshan",
+    city: "Dhaka",
+    address: "Road 11, Banani / Road 27, Dhanmondi",
+    tip: "শান্ত ও নান্দনিক পরিবেশ, সিসিটিভি ক্যামেরা ও ওপেন সিটিং ব্যবস্থা।",
+    google_maps_url: "https://maps.google.com/?q=North+End+Coffee+Roasters+Dhaka",
+    image_url: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80",
+    is_active: true,
+    display_order: 1,
+    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "spot-2",
+    name: "Crimson Cup Coffee",
+    area: "Dhanmondi / Banani",
+    city: "Dhaka",
+    address: "House 275/D, Road 27, Dhanmondi",
+    tip: "কফিপ্রেমীদের পছন্দের আড্ডা, নিরাপদ পারিবারিক পরিবেশ ও মানসম্মত সার্ভিস।",
+    google_maps_url: "https://maps.google.com/?q=Crimson+Cup+Coffee+Dhaka",
+    image_url: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=800&q=80",
+    is_active: true,
+    display_order: 2,
+    created_at: new Date(Date.now() - 25 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "spot-3",
+    name: "Gloria Jean's Coffees",
+    area: "Gulshan-2 / Dhanmondi",
+    city: "Dhaka",
+    address: "South Avenue, Gulshan-2",
+    tip: "আরামদায়ক বসার ব্যবস্থা, প্রিমিয়াম কফি ও প্রথম ডেটের জন্য নিরাপদ স্পট।",
+    google_maps_url: "https://maps.google.com/?q=Gloria+Jeans+Coffees+Dhaka",
+    image_url: "https://images.unsplash.com/photo-1442512595331-e89e73853f31?auto=format&fit=crop&w=800&q=80",
+    is_active: true,
+    display_order: 3,
+    created_at: new Date(Date.now() - 20 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "spot-4",
+    name: "Cha Adda Corner (রবীন্দ্র সরোবর)",
+    area: "Dhanmondi Lake",
+    city: "Dhaka",
+    address: "Rabindra Sarobar, Dhanmondi",
+    tip: "খোলামেলা লেকভিউ, তাজা বাতাস ও খাঁটি গরম মাটির ভাঁড়ের চা।",
+    google_maps_url: "https://maps.google.com/?q=Rabindra+Sarobar+Dhanmondi+Dhaka",
+    image_url: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=800&q=80",
+    is_active: true,
+    display_order: 4,
+    created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "spot-5",
+    name: "Butlers Chocolate Cafe",
+    area: "Gulshan-1",
+    city: "Dhaka",
+    address: "Gulshan Avenue, Gulshan-1",
+    tip: "চমৎকার ডেজার্ট, সিগনেচার হট চকলেট ও আকর্ষণীয় ইনডোর পরিবেশ।",
+    google_maps_url: "https://maps.google.com/?q=Butlers+Chocolate+Cafe+Gulshan+Dhaka",
+    image_url: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80",
+    is_active: true,
+    display_order: 5,
+    created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "spot-6",
+    name: "Coffee World",
+    area: "Uttara Sector 3",
+    city: "Dhaka",
+    address: "Sector 3, Uttara",
+    tip: "উত্তরাবাসীদের জন্য নিরিবিলি ও আরামদায়ক কফি ডেটিং লাউঞ্জ।",
+    google_maps_url: "https://maps.google.com/?q=Coffee+World+Uttara+Dhaka",
+    image_url: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=800&q=80",
+    is_active: true,
+    display_order: 6,
+    created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
 class DevDataStore {
   private profiles: Map<string, Profile> = new Map();
   private photos: Map<string, ProfilePhoto[]> = new Map();
@@ -241,6 +328,7 @@ class DevDataStore {
   private notifications: Notification[] = [];
   private auditLogs: AdminAuditLog[] = [];
   private verificationRequests: VerificationRequest[] = [];
+  private meetingSpots: MeetingSpot[] = [];
   private currentUserId: string = "usr-aria-01"; // Default dev actor
   private platformSettings: PlatformSettings = {
     min_age: 18,
@@ -254,6 +342,9 @@ class DevDataStore {
     initialProfiles.forEach((p) => this.profiles.set(p.id, { ...p }));
     Object.entries(initialPhotos).forEach(([uid, phs]) =>
       this.photos.set(uid, [...phs])
+    );
+    initialMeetingSpots.forEach((spot) =>
+      this.meetingSpots.push({ ...spot })
     );
 
     // Initial pre-configured swipe: Julian already liked Aria!
@@ -807,6 +898,68 @@ class DevDataStore {
     });
 
     return { success: true, request: req };
+  }
+
+  getMeetingSpots(onlyActive: boolean = false): MeetingSpot[] {
+    const spots = [...this.meetingSpots].sort(
+      (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
+    );
+    if (onlyActive) {
+      return spots.filter((s) => s.is_active);
+    }
+    return spots;
+  }
+
+  getMeetingSpot(id: string): MeetingSpot | undefined {
+    return this.meetingSpots.find((s) => s.id === id);
+  }
+
+  saveMeetingSpot(
+    spotData: Omit<MeetingSpot, "id" | "created_at" | "updated_at"> & { id?: string }
+  ): MeetingSpot {
+    const now = new Date().toISOString();
+    if (spotData.id) {
+      const idx = this.meetingSpots.findIndex((s) => s.id === spotData.id);
+      if (idx >= 0) {
+        const updated: MeetingSpot = {
+          ...this.meetingSpots[idx],
+          ...spotData,
+          id: spotData.id,
+          updated_at: now,
+        };
+        this.meetingSpots[idx] = updated;
+        return updated;
+      }
+    }
+
+    const newSpot: MeetingSpot = {
+      ...spotData,
+      id: spotData.id || `spot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      created_at: now,
+      updated_at: now,
+      display_order: spotData.display_order ?? (this.meetingSpots.length + 1),
+    };
+    this.meetingSpots.push(newSpot);
+    return newSpot;
+  }
+
+  deleteMeetingSpot(id: string): boolean {
+    const idx = this.meetingSpots.findIndex((s) => s.id === id);
+    if (idx >= 0) {
+      this.meetingSpots.splice(idx, 1);
+      return true;
+    }
+    return false;
+  }
+
+  toggleMeetingSpotActive(id: string): MeetingSpot | undefined {
+    const spot = this.meetingSpots.find((s) => s.id === id);
+    if (spot) {
+      spot.is_active = !spot.is_active;
+      spot.updated_at = new Date().toISOString();
+      return spot;
+    }
+    return undefined;
   }
 }
 

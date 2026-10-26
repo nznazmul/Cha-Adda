@@ -14,7 +14,8 @@ import {
   ShieldAlert,
   Sparkles,
   ArrowLeft,
-  BadgeCheck
+  BadgeCheck,
+  Coffee
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin", label: "Overview", icon: LayoutDashboard },
     { href: "/admin/users", label: "User Management", icon: Users },
     { href: "/admin/verification", label: "User Verification", icon: BadgeCheck },
+    { href: "/admin/spots", label: "Meeting Spots", icon: Coffee },
     { href: "/admin/reports", label: "Moderation Queue", icon: Flag },
     { href: "/admin/photos", label: "Photo Review", icon: ImageIcon },
     { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
