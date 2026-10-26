@@ -1,6 +1,7 @@
-import { Profile, PublicProfile, ProfilePhoto, Swipe, Match, Message, Report, Notification, AdminAuditLog, PlatformSettings, SwipeAction } from "@/types/database";
+import { Profile, PublicProfile, ProfilePhoto, Swipe, Match, Message, Report, Notification, AdminAuditLog, PlatformSettings, SwipeAction, VerificationRequest } from "@/types/database";
 import { bengaliFemaleProfiles, bengaliFemalePhotos } from "@/lib/data/bengali-bots";
 import { getMemberId, isMatchingMemberId } from "@/lib/utils/member-id";
+import { calculateVerificationExpiry, VerificationDurationPreset } from "@/lib/utils/verification";
 
 // Seed development profiles
 const initialProfiles: Profile[] = [
@@ -239,6 +240,7 @@ class DevDataStore {
   private reports: Report[] = [];
   private notifications: Notification[] = [];
   private auditLogs: AdminAuditLog[] = [];
+  private verificationRequests: VerificationRequest[] = [];
   private currentUserId: string = "usr-aria-01"; // Default dev actor
   private platformSettings: PlatformSettings = {
     min_age: 18,
@@ -289,6 +291,24 @@ class DevDataStore {
         created_at: new Date(Date.now() - 75000000).toISOString(),
       }
     );
+
+    // Initial pending verification request for Julian Ross (so admin can review it immediately!)
+    this.verificationRequests.push({
+      id: "ver-init-julian-01",
+      user_id: "usr-julian-02",
+      selfie_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80",
+      status: "pending",
+      submitted_at: new Date(Date.now() - 3600000 * 3).toISOString(),
+      user: {
+        id: "usr-julian-02",
+        display_name: "Julian Ross",
+        city: "Dhaka",
+        date_of_birth: "1996-09-22",
+        gender: "man",
+        primary_photo_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80",
+        unique_id: "CA-M9692-02",
+      },
+    });
   }
 
   getCurrentUserId(): string {
@@ -677,6 +697,116 @@ class DevDataStore {
       updated_at: new Date().toISOString(),
     };
     return { ...this.platformSettings };
+  }
+
+  submitVerificationRequest(userId: string, selfieUrl: string): VerificationRequest {
+    const existingIdx = this.verificationRequests.findIndex(
+      (r) => r.user_id === userId && r.status === "pending"
+    );
+
+    const profile = this.profiles.get(userId);
+    const photos = this.photos.get(userId) || [];
+    const primary = photos.find((p) => p.is_primary) || photos[0];
+
+    const newReq: VerificationRequest = {
+      id: `ver-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      user_id: userId,
+      selfie_url: selfieUrl,
+      status: "pending",
+      submitted_at: new Date().toISOString(),
+      user: profile
+        ? {
+            id: profile.id,
+            display_name: profile.display_name,
+            city: profile.city,
+            date_of_birth: profile.date_of_birth,
+            gender: profile.gender,
+            primary_photo_url: primary?.url,
+            unique_id: getMemberId(profile),
+          }
+        : undefined,
+    };
+
+    if (existingIdx >= 0) {
+      this.verificationRequests[existingIdx] = newReq;
+    } else {
+      this.verificationRequests.unshift(newReq);
+    }
+
+    return newReq;
+  }
+
+  getVerificationRequests(): VerificationRequest[] {
+    // Enrich requests with current profile info
+    return this.verificationRequests.map((req) => {
+      const p = this.profiles.get(req.user_id);
+      const photos = this.photos.get(req.user_id) || [];
+      const primary = photos.find((ph) => ph.is_primary) || photos[0];
+      return {
+        ...req,
+        user: p
+          ? {
+              id: p.id,
+              display_name: p.display_name,
+              city: p.city,
+              date_of_birth: p.date_of_birth,
+              gender: p.gender,
+              primary_photo_url: primary?.url,
+              unique_id: getMemberId(p),
+            }
+          : req.user,
+      };
+    });
+  }
+
+  getVerificationRequestByUser(userId: string): VerificationRequest | undefined {
+    return this.verificationRequests.find((r) => r.user_id === userId);
+  }
+
+  reviewVerificationRequest(
+    requestId: string,
+    status: "approved" | "rejected",
+    adminId: string,
+    durationPreset?: VerificationDurationPreset,
+    reason?: string
+  ): { success: boolean; request?: VerificationRequest } {
+    const req = this.verificationRequests.find((r) => r.id === requestId);
+    if (!req) return { success: false };
+
+    req.status = status;
+    req.reviewed_at = new Date().toISOString();
+    req.reviewed_by = adminId;
+    req.duration_preset = durationPreset || null;
+    req.rejection_reason = reason || null;
+
+    const profile = this.profiles.get(req.user_id);
+    if (profile) {
+      if (status === "approved") {
+        profile.verified = true;
+        profile.verified_until = calculateVerificationExpiry(durationPreset || "1_month");
+      } else {
+        profile.verified = false;
+      }
+      profile.updated_at = new Date().toISOString();
+    }
+
+    this.auditLogs.unshift({
+      id: `audit-${Date.now()}`,
+      admin_id: adminId,
+      admin_name: "Admin",
+      action_type: status === "approved" ? "VERIFICATION_APPROVED" : "VERIFICATION_REJECTED",
+      target_type: "user_verification",
+      target_id: req.user_id,
+      reason: reason || (status === "approved" ? `Approved Blue Tick for ${durationPreset || "1_month"}` : "Rejected selfie verification"),
+      metadata: {
+        requestId,
+        durationPreset,
+        status,
+      },
+      created_at: new Date().toISOString(),
+    });
+
+    return { success: true, request: req };
   }
 }
 

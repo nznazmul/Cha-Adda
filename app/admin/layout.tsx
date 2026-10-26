@@ -13,7 +13,8 @@ import {
   FileText, 
   ShieldAlert,
   Sparkles,
-  ArrowLeft
+  ArrowLeft,
+  BadgeCheck
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navItems = [
     { href: "/admin", label: "Overview", icon: LayoutDashboard },
     { href: "/admin/users", label: "User Management", icon: Users },
+    { href: "/admin/verification", label: "User Verification", icon: BadgeCheck },
     { href: "/admin/reports", label: "Moderation Queue", icon: Flag },
     { href: "/admin/photos", label: "Photo Review", icon: ImageIcon },
     { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },

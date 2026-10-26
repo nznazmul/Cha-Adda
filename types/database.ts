@@ -220,3 +220,24 @@ export interface PlatformSettings {
   updated_at?: string;
   updated_by?: string;
 }
+
+export interface VerificationRequest {
+  id: string;
+  user_id: string;
+  selfie_url: string;
+  status: "pending" | "approved" | "rejected";
+  submitted_at: string;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  rejection_reason?: string | null;
+  duration_preset?: string | null;
+  user?: {
+    id: string;
+    display_name: string;
+    city?: string;
+    date_of_birth?: string;
+    gender?: string;
+    primary_photo_url?: string;
+    unique_id?: string | null;
+  };
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import confetti from "canvas-confetti";
 import { 
@@ -12,13 +12,16 @@ import {
   Copy,
   Coffee,
   ShieldCheck,
-  Camera,
-  X
+  Clock,
+  AlertCircle
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { getMemberId } from "@/lib/utils/member-id";
-import { isProfileVerified, getVerificationDetails, calculateVerificationExpiry } from "@/lib/utils/verification";
+import { isProfileVerified, getVerificationDetails } from "@/lib/utils/verification";
 import { BlueTickBadge } from "@/components/ui/blue-tick-badge";
+import { VerificationRequest } from "@/types/database";
+import { submitSelfieVerification, fetchMyVerificationStatus } from "@/lib/services/verification-service";
+import { SelfieCameraModal } from "@/components/profile/selfie-camera-modal";
 
 export default function ProfilePage() {
   const { user, updateCurrentProfile } = useAuth();
@@ -35,10 +38,27 @@ export default function ProfilePage() {
   const [prompt2, setPrompt2] = useState("চা নাকি কফি, আর প্রিয় ভ্রমণ স্মৃতি নিয়ে!");
   const [prompt3, setPrompt3] = useState("চায়ের সাথে মুচমুচে গরম সিঙ্গাড়া অথবা বাকরখানি।");
 
-  // Selfie Verification Modal state
+  // Selfie Verification State
   const [showVerificationModal, setShowVerificationModal] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [verifiedSuccess, setVerifiedSuccess] = useState(false);
+  const [verificationRequest, setVerificationRequest] = useState<VerificationRequest | null>(null);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchMyVerificationStatus(user.id).then((req) => {
+        if (req) setVerificationRequest(req);
+      });
+    }
+  }, [user?.id]);
+
+  const handleSelfieSubmit = async (selfieDataUrl: string): Promise<boolean> => {
+    if (!user) return false;
+    const res = await submitSelfieVerification(user.id, selfieDataUrl);
+    if (res.success && res.request) {
+      setVerificationRequest(res.request);
+      return true;
+    }
+    return false;
+  };
 
   if (!user) {
     return (
@@ -81,29 +101,7 @@ export default function ProfilePage() {
     setTimeout(() => setSavedNotice(false), 3000);
   };
 
-  const handleRunSelfieVerification = () => {
-    setVerifying(true);
-    setTimeout(() => {
-      setVerifying(false);
-      setVerifiedSuccess(true);
-      const expiry = calculateVerificationExpiry("1_month");
-      updateCurrentProfile({ verified: true, verified_until: expiry });
-      try {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ["#3b82f6", "#10b981", "#e11d48"],
-        });
-      } catch {
-        // Safe fallback
-      }
-      setTimeout(() => {
-        setShowVerificationModal(false);
-        setVerifiedSuccess(false);
-      }, 2000);
-    }, 1800);
-  };
+  // Clean removal of fake verification timer
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
@@ -175,9 +173,11 @@ export default function ProfilePage() {
         </div>
 
         {/* Conditional Verification Bar:
-            - If user already has active Blue Tick: AUTO VANISH the "সেলফি ভেরিফিকেশন (Blue Tick)" text and button!
-              Instead show the official active verified badge with expiry duration details.
-            - If not verified (or expired): show the selfie verification prompt so user can verify.
+            1. If user already has active Blue Tick: AUTO VANISH the "সেলফি ভেরিফিকেশন (Blue Tick)" text and button!
+               Instead show the official active verified badge with expiry duration details.
+            2. If user submitted selfie and it is pending review: Show Under Review banner (Auto-vanish verify button).
+            3. If user's request was rejected: Show rejection reason and button to retake.
+            4. Otherwise: Show the Selfie Verification trigger button.
         */}
         {hasBlueTick ? (
           <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/30 text-xs shadow-sm">
@@ -204,6 +204,50 @@ export default function ProfilePage() {
               </span>
             </div>
           </div>
+        ) : verificationRequest?.status === "pending" ? (
+          <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/20 text-amber-500 shrink-0">
+                <Clock className="h-4 w-4" />
+              </span>
+              <div>
+                <div className="flex items-center gap-1.5 font-bold text-amber-500">
+                  <span>সেলফি যাচাই অপেক্ষমান (Under Review)</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  আপনার লাইভ সেলফি সফলভাবে জমা হয়েছে। অ্যাডমিন প্যানেলে যাচাই চলছে, অনুমোদন হলেই ব্লু টিক চালু হবে।
+                </p>
+              </div>
+            </div>
+            <div className="self-end sm:self-center">
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/15 px-2.5 py-1 rounded-full border border-amber-500/25">
+                Pending Review ⏳
+              </span>
+            </div>
+          </div>
+        ) : verificationRequest?.status === "rejected" ? (
+          <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-destructive/10 border border-destructive/30 text-xs shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-destructive/20 text-destructive shrink-0">
+                <AlertCircle className="h-4 w-4" />
+              </span>
+              <div>
+                <div className="flex items-center gap-1.5 font-bold text-destructive">
+                  <span>সেলফি যাচাই বাতিল হয়েছে</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  কারণ: {verificationRequest.rejection_reason || "মুখমণ্ডল অস্পষ্ট ছিল। অনুগ্রহ করে পর্যাপ্ত আলোতে পুনরায় চেষ্টা করুন।"}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowVerificationModal(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-destructive hover:bg-destructive/90 text-white font-bold text-[11px] transition-colors shadow-sm shrink-0 self-end sm:self-center"
+            >
+              আবার সেলফি তুলুন 📸
+            </button>
+          </div>
         ) : (
           <div className="mt-6 flex items-center justify-between p-3 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-xs">
             <div className="flex items-center gap-2">
@@ -213,7 +257,7 @@ export default function ProfilePage() {
                 <span className="text-[10px] text-muted-foreground">
                   {verificationDetails.isExpired
                     ? "আপনার আগের ব্লু টিকের মেয়াদ শেষ হয়েছে। পুনরায় যাচাই করুন।"
-                    : "প্রোফাইলে অফিশিয়াল ব্লু টিক ব্যাজ পান"}
+                    : "ক্যামেরায় মুখ স্ক্যান করে প্রোফাইলে অফিশিয়াল ব্লু টিক পান"}
                 </span>
               </div>
             </div>
@@ -415,56 +459,12 @@ export default function ProfilePage() {
         </Link>
       </div>
 
-      {/* Selfie Photo Verification Modal */}
-      {showVerificationModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-          <div className="relative w-full max-w-sm rounded-3xl border border-sky-500/30 bg-card p-6 text-center shadow-2xl">
-            <button
-              onClick={() => setShowVerificationModal(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-full bg-secondary text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-500 mx-auto mb-3">
-              <Camera className="h-7 w-7" />
-            </div>
-
-            <h3 className="text-lg font-black">সেলফি ভেরিফিকেশন (Blue Badge)</h3>
-            <p className="text-xs text-muted-foreground mt-1 mb-5">
-              ক্যামেরার দিকে তাকিয়ে হাসিমুখের একটি সেলফি তুলুন। এআই চেহারা যাচাই করে ব্লু টিক প্রদান করবে।
-            </p>
-
-            <div className="relative aspect-square max-w-[200px] mx-auto rounded-3xl overflow-hidden border-2 border-dashed border-sky-500/40 bg-secondary flex items-center justify-center mb-5">
-              {verifying ? (
-                <div className="flex flex-col items-center gap-2">
-                  <Sparkles className="h-8 w-8 text-sky-500 animate-spin" />
-                  <span className="text-xs font-bold text-sky-400">মুখমণ্ডল স্ক্যান করা হচ্ছে...</span>
-                </div>
-              ) : verifiedSuccess ? (
-                <div className="flex flex-col items-center gap-2 text-emerald-400">
-                  <Check className="h-10 w-10 stroke-[3]" />
-                  <span className="text-xs font-bold">ভেরিফিকেশন সফল!</span>
-                </div>
-              ) : (
-                <div className="text-center p-4">
-                  <Camera className="h-8 w-8 text-muted-foreground mx-auto mb-1 opacity-70" />
-                  <span className="text-[11px] text-muted-foreground">পোজ: ক্যামেরার দিকে সোজা তাকান</span>
-                </div>
-              )}
-            </div>
-
-            <button
-              type="button"
-              disabled={verifying || verifiedSuccess}
-              onClick={handleRunSelfieVerification}
-              className="w-full py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 text-white text-xs font-bold shadow-lg shadow-sky-500/25 hover:opacity-95 active:scale-98 transition-all disabled:opacity-50"
-            >
-              {verifying ? "যাচাই হচ্ছে..." : verifiedSuccess ? "অভিনন্দন!" : "সেলফি তুলুন ও ভেরিফাই করুন 📸"}
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Live Camera Selfie Verification Modal */}
+      <SelfieCameraModal
+        isOpen={showVerificationModal}
+        onClose={() => setShowVerificationModal(false)}
+        onSubmitSelfie={handleSelfieSubmit}
+      />
     </div>
   );
 }

@@ -11,7 +11,9 @@ import {
   UserX, 
   ShieldCheck, 
   ArrowUpRight,
-  Sparkles
+  Sparkles,
+  BadgeCheck,
+  Camera
 } from "lucide-react";
 import { fetchAdminMetrics } from "@/lib/services/admin-service";
 import { AdminAnalyticsMetrics } from "@/types/database";
@@ -76,10 +78,44 @@ export default function AdminOverviewPage() {
       </div>
 
       {/* Quick Moderation Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="rounded-3xl border border-border/80 bg-card p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold">Safety & Moderation Queue</h2>
+            <h2 className="text-base font-bold flex items-center gap-2">
+              <BadgeCheck className="h-4 w-4 text-sky-500" />
+              <span>User Verification</span>
+            </h2>
+            <Link
+              href="/admin/verification"
+              className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+            >
+              <span>Inspect</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Review face-camera selfies submitted by users. Compare side-by-side with profile pictures and grant Blue Tick badges.
+          </p>
+          <div className="p-4 rounded-2xl border border-sky-500/20 bg-sky-500/5 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Camera className="h-4 w-4 text-sky-500" />
+              <span className="text-xs font-bold text-sky-600 dark:text-sky-400">Selfie Match Review</span>
+            </div>
+            <Link
+              href="/admin/verification"
+              className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold transition-all shadow-sm"
+            >
+              Open Module
+            </Link>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-border/80 bg-card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold flex items-center gap-2">
+              <Flag className="h-4 w-4 text-rose-500" />
+              <span>Safety Queue</span>
+            </h2>
             <Link
               href="/admin/reports"
               className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
@@ -107,12 +143,15 @@ export default function AdminOverviewPage() {
 
         <div className="rounded-3xl border border-border/80 bg-card p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold">User Directory & Status</h2>
+            <h2 className="text-base font-bold flex items-center gap-2">
+              <Users className="h-4 w-4 text-emerald-500" />
+              <span>User Directory</span>
+            </h2>
             <Link
               href="/admin/users"
               className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
             >
-              <span>Manage Users</span>
+              <span>Manage</span>
               <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -120,12 +159,12 @@ export default function AdminOverviewPage() {
             Inspect accounts, search members, verify adult requirements, or issue temporary suspensions.
           </p>
           <div className="p-4 rounded-2xl border border-border bg-secondary/30 flex items-center justify-between">
-            <span className="text-xs font-bold">{metrics?.totalUsers ?? 0} Accounts Registered</span>
+            <span className="text-xs font-bold">{metrics?.totalUsers ?? 0} Accounts</span>
             <Link
               href="/admin/users"
               className="px-3 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground text-xs font-bold border border-border"
             >
-              Inspect Directory
+              Inspect
             </Link>
           </div>
         </div>
