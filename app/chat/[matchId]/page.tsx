@@ -32,6 +32,12 @@ import { unmatchUser } from "@/lib/services/matching-service";
 import { blockMember } from "@/lib/services/safety-service";
 import { Message, PublicProfile } from "@/types/database";
 import { cn, formatDate } from "@/lib/utils";
+import { 
+  playVoiceNote, 
+  stopCurrentVoice, 
+  extractVoiceDuration, 
+  voiceAudioCache 
+} from "@/lib/utils/voice-player";
 
 const SAFE_CAFES = [
   { name: "North End Coffee Roasters", area: "Banani / Dhanmondi / Gulshan", tip: "শান্ত ও নান্দনিক পরিবেশ" },
@@ -59,13 +65,33 @@ function ChatConversationContent() {
   const [showCafePicker, setShowCafePicker] = useState(false);
   const [confirmUnmatch, setConfirmUnmatch] = useState(false);
 
-  // Voice note state
+  // Voice note recording state
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [activeVoicePlayingId, setActiveVoicePlayingId] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+
+  // Voice note playback state
+  const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+  const [playingProgress, setPlayingProgress] = useState(0);
+  const [playbackCurrentTime, setPlaybackCurrentTime] = useState(0);
+  const stopPlaybackRef = useRef<(() => void) | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Stop playback and recording when leaving the chat screen
+  useEffect(() => {
+    return () => {
+      stopCurrentVoice();
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     async function loadChat() {
@@ -149,9 +175,30 @@ function ChatConversationContent() {
     }
   };
 
-  const startVoiceRecording = () => {
+  const startVoiceRecording = async () => {
     setIsRecording(true);
     setRecordingSeconds(0);
+    audioChunksRef.current = [];
+
+    try {
+      if (typeof window !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef.current = stream;
+        const recorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+
+        recorder.start(100);
+      }
+    } catch (err) {
+      console.warn("Microphone access unavailable or denied, using simulated audio capture:", err);
+    }
+
     timerRef.current = setInterval(() => {
       setRecordingSeconds((prev) => prev + 1);
     }, 1000);
@@ -159,8 +206,20 @@ function ChatConversationContent() {
 
   const cancelVoiceRecording = () => {
     if (timerRef.current) clearInterval(timerRef.current);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {
+        // Safe
+      }
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
     setIsRecording(false);
     setRecordingSeconds(0);
+    audioChunksRef.current = [];
   };
 
   const finishVoiceRecording = async () => {
@@ -169,16 +228,76 @@ function ChatConversationContent() {
     setIsRecording(false);
     setRecordingSeconds(0);
 
+    let audioBlob: Blob | null = null;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      try {
+        mediaRecorderRef.current.stop();
+        if (audioChunksRef.current.length > 0) {
+          audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        }
+      } catch {
+        // Safe
+      }
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+
     if (!user) return;
     try {
       const voiceContent = `🎙️ [Voice Note • ${duration}s]`;
       const sentMsg = await postChatMessage(matchId, user.id, voiceContent);
       sentMsg.message_type = "voice";
       sentMsg.voice_duration = duration;
+
+      if (audioBlob) {
+        const audioUrl = URL.createObjectURL(audioBlob);
+        voiceAudioCache.set(sentMsg.id, audioUrl);
+      }
+
       setMessages((prev) => [...prev, sentMsg]);
     } catch (err) {
       console.error("Failed to send voice note:", err);
     }
+  };
+
+  const handleTogglePlayVoice = (msg: Message) => {
+    const duration = extractVoiceDuration(msg.content, msg.voice_duration);
+
+    if (playingMessageId === msg.id) {
+      // Pause/Stop
+      if (stopPlaybackRef.current) stopPlaybackRef.current();
+      stopCurrentVoice();
+      setPlayingMessageId(null);
+      setPlayingProgress(0);
+      setPlaybackCurrentTime(0);
+      return;
+    }
+
+    // Stop whatever else is playing
+    if (stopPlaybackRef.current) stopPlaybackRef.current();
+    stopCurrentVoice();
+
+    setPlayingMessageId(msg.id);
+    setPlayingProgress(0);
+    setPlaybackCurrentTime(0);
+
+    const cancel = playVoiceNote({
+      messageId: msg.id,
+      duration,
+      onProgress: (prog, currentSec) => {
+        setPlayingProgress(prog);
+        setPlaybackCurrentTime(currentSec);
+      },
+      onEnded: () => {
+        setPlayingMessageId(null);
+        setPlayingProgress(0);
+        setPlaybackCurrentTime(0);
+      },
+    });
+
+    stopPlaybackRef.current = cancel;
   };
 
   const handleSelectCafe = (cafe: typeof SAFE_CAFES[0]) => {
@@ -379,11 +498,11 @@ function ChatConversationContent() {
                   isMe ? "ml-auto items-end" : "mr-auto items-start"
                 )}
               >
-                {/* Voice Note Message Bubble */}
+                {/* Voice Note Message Bubble with Real Sound Playback & Auto-stop */}
                 {isVoice ? (
                   <div
                     className={cn(
-                      "rounded-2xl p-3 shadow-md flex items-center gap-3 min-w-[200px]",
+                      "rounded-2xl p-3 shadow-md flex items-center gap-3 min-w-[220px] sm:min-w-[260px]",
                       isMe
                         ? "bg-gradient-to-tr from-rose-600 to-rose-500 text-white rounded-br-xs"
                         : "bg-secondary text-foreground rounded-bl-xs"
@@ -391,42 +510,55 @@ function ChatConversationContent() {
                   >
                     <button
                       type="button"
-                      onClick={() => {
-                        setActiveVoicePlayingId(activeVoicePlayingId === msg.id ? null : msg.id);
-                      }}
+                      onClick={() => handleTogglePlayVoice(msg)}
                       className={cn(
-                        "h-10 w-10 rounded-full flex items-center justify-center shrink-0 shadow-sm transition-transform active:scale-95",
-                        isMe ? "bg-white text-rose-600" : "bg-primary text-white"
+                        "h-10 w-10 rounded-full flex items-center justify-center shrink-0 shadow-md transition-transform active:scale-95",
+                        isMe ? "bg-white text-rose-600 hover:bg-white/95" : "bg-primary text-white hover:bg-primary/95"
                       )}
+                      title={playingMessageId === msg.id ? "Pause voice note" : "Play voice note"}
                     >
-                      {activeVoicePlayingId === msg.id ? (
-                        <Pause className="h-5 w-5" />
+                      {playingMessageId === msg.id ? (
+                        <Pause className="h-5 w-5 fill-current" />
                       ) : (
-                        <Play className="h-5 w-5 ml-0.5" />
+                        <Play className="h-5 w-5 fill-current ml-0.5" />
                       )}
                     </button>
 
-                    <div className="flex-1 flex flex-col gap-1">
-                      {/* Audio waveform simulator */}
-                      <div className="flex items-center gap-0.5 h-6">
-                        {[40, 70, 30, 90, 60, 100, 40, 80, 50, 90, 30, 60, 85, 40, 60].map((h, i) => (
-                          <div
-                            key={i}
-                            style={{ height: `${h}%` }}
-                            className={cn(
-                              "w-1 rounded-full transition-all",
-                              activeVoicePlayingId === msg.id && i % 3 === 0
-                                ? "bg-amber-300 animate-pulse"
-                                : isMe
-                                ? "bg-white/70"
-                                : "bg-primary/60"
-                            )}
-                          />
-                        ))}
+                    <div className="flex-1 flex flex-col gap-1 min-w-0">
+                      {/* Waveform Bar Scrubber that lights up as voice plays */}
+                      <div className="flex items-center gap-1 h-6">
+                        {[30, 65, 40, 85, 55, 95, 45, 80, 60, 90, 40, 75, 50, 70, 45].map((h, i) => {
+                          const barThreshold = i / 15;
+                          const isPassed = playingMessageId === msg.id && playingProgress >= barThreshold;
+                          return (
+                            <div
+                              key={i}
+                              style={{ height: `${h}%` }}
+                              className={cn(
+                                "w-1 rounded-full transition-all duration-75",
+                                isPassed
+                                  ? isMe
+                                    ? "bg-amber-300"
+                                    : "bg-rose-500"
+                                  : isMe
+                                  ? "bg-white/45"
+                                  : "bg-muted-foreground/35"
+                              )}
+                            />
+                          );
+                        })}
                       </div>
-                      <span className="text-[10px] opacity-80">
-                        {activeVoicePlayingId === msg.id ? "Playing..." : `${msg.voice_duration || "12"}s Voice Note`}
-                      </span>
+
+                      <div className="flex items-center justify-between text-[11px] opacity-90 font-mono">
+                        <span>
+                          {playingMessageId === msg.id
+                            ? `0:0${Math.floor(playbackCurrentTime)}`
+                            : `0:0${extractVoiceDuration(msg.content, msg.voice_duration)}`}
+                        </span>
+                        <span className="text-[10px] opacity-75">
+                          {playingMessageId === msg.id ? "Playing..." : "Voice Note"}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ) : isTeaInvite ? (
