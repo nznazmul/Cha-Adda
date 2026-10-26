@@ -20,7 +20,8 @@ import {
   Search,
   Coffee,
   Send,
-  Check
+  Check,
+  User
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { fetchDiscoveryCandidates, submitSwipe, searchMembers } from "@/lib/services/matching-service";
@@ -732,6 +733,14 @@ export default function DiscoverPage() {
                   <Coffee className="h-4 w-4" />
                   <span>চা খাওয়ার দাওয়াত পাঠান ☕</span>
                 </button>
+
+                <Link
+                  href={`/profile/${inspectProfile.id}`}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl border border-border bg-secondary hover:bg-secondary/80 text-foreground font-semibold text-xs transition-colors"
+                >
+                  <User className="h-3.5 w-3.5 text-primary" />
+                  <span>View Full Profile Page</span>
+                </Link>
 
                 <div className="flex items-center justify-between text-xs pt-1">
                   <Link

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Moon,
@@ -9,7 +10,11 @@ import {
   Lock,
   Trash2,
   LogOut,
-  SlidersHorizontal
+  SlidersHorizontal,
+  ArrowLeft,
+  Sparkles,
+  Shield,
+  ChevronRight
 } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useAuth } from "@/components/providers/auth-context";
@@ -49,7 +54,15 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <Link
+          href="/profile"
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground transition-colors"
+          aria-label="Back to Profile"
+          title="Back to Profile"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Settings</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -178,6 +191,48 @@ export default function SettingsPage() {
               className="h-5 w-5 accent-primary"
             />
           </div>
+        </div>
+      </section>
+
+      {/* Membership & Safety Shortcuts */}
+      <section className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm space-y-4">
+        <div className="flex items-center gap-2 text-primary font-bold text-sm">
+          <Sparkles className="h-4 w-4 text-amber-500" />
+          <span>Membership & Safety</span>
+        </div>
+
+        <div className="space-y-2 pt-1">
+          <Link
+            href="/subscription"
+            className="flex items-center justify-between p-3 rounded-2xl border border-border/80 bg-secondary/30 hover:bg-secondary/70 transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-foreground">CHA ADDA Subscription & Packs</p>
+                <p className="text-[11px] text-muted-foreground">Manage Plus, Gold, Platinum plans and Tea Invites</p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+          </Link>
+
+          <Link
+            href="/safety"
+            className="flex items-center justify-between p-3 rounded-2xl border border-border/80 bg-secondary/30 hover:bg-secondary/70 transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
+                <Shield className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-foreground">Dating Safety Guide</p>
+                <p className="text-[11px] text-muted-foreground">In-person safety tips, public venues, and guidance</p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+          </Link>
         </div>
       </section>
 

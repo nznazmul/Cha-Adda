@@ -368,3 +368,29 @@ export async function searchMembers(
     return devStore.searchMembers(trimmed, currentUserId);
   }
 }
+
+export async function fetchPublicProfile(userId: string): Promise<PublicProfile | null> {
+  const trimmed = (userId || "").trim();
+  if (!trimmed) return null;
+
+  try {
+    const res = await fetch(`/api/users/${encodeURIComponent(trimmed)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.profile) {
+        return data.profile;
+      }
+    }
+  } catch {
+    // API failed or running in non-fetch environment
+  }
+
+  // Resilient devStore fallback
+  const local = devStore.getProfile(trimmed);
+  if (local) {
+    return devStore.toPublicProfile(local);
+  }
+
+  return null;
+}
+

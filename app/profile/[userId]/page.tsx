@@ -5,18 +5,15 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { 
   ArrowLeft, 
-  MapPin, 
-  Briefcase, 
   ShieldAlert, 
   Heart, 
   X, 
-  Check, 
-  Flag
+  Flag,
+  Edit3
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
-import { devStore } from "@/lib/services/dev-store";
 import { blockMember } from "@/lib/services/safety-service";
-import { submitSwipe } from "@/lib/services/matching-service";
+import { submitSwipe, fetchPublicProfile } from "@/lib/services/matching-service";
 import { PublicProfile } from "@/types/database";
 import { getMemberId } from "@/lib/utils/member-id";
 import { BlueTickBadge } from "@/components/ui/blue-tick-badge";
@@ -30,17 +27,28 @@ function PublicProfileViewContent() {
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [blocked, setBlocked] = useState(false);
+  const isSelf = Boolean(user && profile && user.id === profile.id);
 
   useEffect(() => {
+    let isMounted = true;
     async function load() {
       if (!userId) return;
-      const rawProfile = devStore.getProfile(userId);
-      if (rawProfile) {
-        setProfile(devStore.toPublicProfile(rawProfile));
+      setLoading(true);
+      try {
+        const p = await fetchPublicProfile(userId);
+        if (isMounted) {
+          setProfile(p);
+        }
+      } catch (err) {
+        console.error("Error loading profile:", err);
+      } finally {
+        if (isMounted) setLoading(false);
       }
-      setLoading(false);
     }
     load();
+    return () => {
+      isMounted = false;
+    };
   }, [userId]);
 
   const handleLike = async () => {
@@ -166,39 +174,57 @@ function PublicProfileViewContent() {
           )}
 
           {/* Safety Actions */}
-          <div className="pt-4 border-t border-border flex items-center justify-between text-xs">
-            <button
-              onClick={handleBlock}
-              className="flex items-center gap-1.5 text-muted-foreground hover:text-destructive font-medium transition-colors"
-            >
-              <ShieldAlert className="h-4 w-4" />
-              <span>Block Member</span>
-            </button>
-            <Link
-              href={`/safety/report/${profile.id}`}
-              className="text-muted-foreground hover:text-destructive font-medium transition-colors"
-            >
-              Report violation
-            </Link>
-          </div>
+          {!isSelf && (
+            <div className="pt-4 border-t border-border flex items-center justify-between text-xs">
+              <button
+                onClick={handleBlock}
+                className="flex items-center gap-1.5 text-muted-foreground hover:text-destructive font-medium transition-colors"
+              >
+                <ShieldAlert className="h-4 w-4" />
+                <span>Block Member</span>
+              </button>
+              <Link
+                href={`/safety/report/${profile.id}`}
+                className="text-muted-foreground hover:text-destructive font-medium transition-colors"
+              >
+                Report violation
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Floating Action Buttons */}
-      <div className="flex items-center justify-center gap-6 mt-6">
-        <button
-          onClick={handlePass}
-          className="flex h-14 w-14 items-center justify-center rounded-full border border-rose-500/30 bg-card text-rose-500 shadow-xl hover:scale-105 active:scale-95 transition-all"
-        >
-          <X className="h-7 w-7" />
-        </button>
-        <button
-          onClick={handleLike}
-          className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-tr from-rose-600 to-amber-500 text-white shadow-xl shadow-rose-500/40 hover:scale-105 active:scale-95 transition-all"
-        >
-          <Heart className="h-8 w-8 fill-white" />
-        </button>
-      </div>
+      {isSelf ? (
+        <div className="flex items-center justify-center gap-3 mt-6">
+          <Link
+            href="/profile"
+            className="px-6 py-3 rounded-full bg-gradient-to-r from-rose-600 to-amber-500 text-white text-xs font-bold shadow-lg shadow-rose-500/25 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+          >
+            <Edit3 className="h-4 w-4" />
+            <span>Edit My Profile</span>
+          </Link>
+        </div>
+      ) : (
+        <div className="flex items-center justify-center gap-6 mt-6">
+          <button
+            onClick={handlePass}
+            className="flex h-14 w-14 items-center justify-center rounded-full border border-rose-500/30 bg-card text-rose-500 shadow-xl hover:scale-105 active:scale-95 transition-all"
+            title="Pass"
+            aria-label="Pass"
+          >
+            <X className="h-7 w-7" />
+          </button>
+          <button
+            onClick={handleLike}
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-tr from-rose-600 to-amber-500 text-white shadow-xl shadow-rose-500/40 hover:scale-105 active:scale-95 transition-all"
+            title="Like"
+            aria-label="Like"
+          >
+            <Heart className="h-8 w-8 fill-white" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

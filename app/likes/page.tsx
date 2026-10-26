@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Heart, Sparkles, Lock, ArrowRight, ShieldCheck, Flame } from "lucide-react";
+import { Heart, Sparkles, Lock, ArrowRight } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { fetchIncomingLikes } from "@/lib/services/matching-service";
 import { PublicProfile } from "@/types/database";
@@ -11,7 +11,7 @@ export default function LikesPage() {
   const { user } = useAuth();
   const [incomingLikes, setIncomingLikes] = useState<PublicProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isGoldMember] = useState(() => {
+  const [isGoldMember, setIsGoldMember] = useState(() => {
     if (typeof window !== "undefined") {
       const tier = localStorage.getItem("cha_adda_subscription_tier");
       return tier === "gold" || tier === "platinum";
@@ -20,6 +20,14 @@ export default function LikesPage() {
   });
 
   const hasGoldAccess = isGoldMember || user?.role === "admin";
+
+  const toggleGoldTest = () => {
+    const next = !isGoldMember;
+    setIsGoldMember(next);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("cha_adda_subscription_tier", next ? "gold" : "free");
+    }
+  };
 
   useEffect(() => {
     async function loadLikes() {
@@ -43,9 +51,17 @@ export default function LikesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 text-rose-500 text-xs font-bold mb-2">
-            <Heart className="h-3.5 w-3.5 fill-rose-500" />
-            <span>{incomingLikes.length} People Liked You</span>
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 text-rose-500 text-xs font-bold">
+              <Heart className="h-3.5 w-3.5 fill-rose-500" />
+              <span>{incomingLikes.length} People Liked You</span>
+            </div>
+            {hasGoldAccess && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-500 text-[10px] font-black tracking-wide">
+                <Sparkles className="h-3 w-3" />
+                <span>GOLD UNLOCKED</span>
+              </span>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Likes You</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -53,16 +69,27 @@ export default function LikesPage() {
           </p>
         </div>
 
-        {/* Upgrade Pill */}
-        {!hasGoldAccess && (
-          <Link
-            href="/subscription"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-600 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:scale-105 transition-all"
-          >
-            <Sparkles className="h-4 w-4" />
-            <span>Upgrade to Gold to Reveal</span>
-          </Link>
-        )}
+        {/* Upgrade / Test Action */}
+        <div className="flex items-center gap-3">
+          {!hasGoldAccess ? (
+            <Link
+              href="/subscription"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-600 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:scale-105 transition-all"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Upgrade to Gold to Reveal</span>
+            </Link>
+          ) : (
+            <button
+              onClick={toggleGoldTest}
+              type="button"
+              className="px-3.5 py-1.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-[11px] font-semibold text-muted-foreground transition-colors"
+              title="Toggle preview of locked state"
+            >
+              <span>Switch View Mode</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -80,54 +107,81 @@ export default function LikesPage() {
           </p>
           <Link
             href="/discover"
-            className="px-6 py-2.5 rounded-full bg-primary text-white text-xs font-bold"
+            className="px-6 py-2.5 rounded-full bg-primary text-white text-xs font-bold shadow-md shadow-primary/25 hover:opacity-95"
           >
             Explore Profiles
           </Link>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {incomingLikes.map((liker, idx) => (
-            <div
-              key={idx}
-              className="relative aspect-[3/4.2] rounded-2xl overflow-hidden border border-border bg-card shadow-sm group"
-            >
-              {/* Liker Photo with blur conditional on subscription tier */}
-              <img
-                src={liker.primary_photo_url || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80"}
-                alt=""
-                className={`w-full h-full object-cover transition-transform group-hover:scale-105 ${
-                  !hasGoldAccess ? "blur-md scale-110" : ""
-                }`}
-              />
+          {incomingLikes.map((liker, idx) => {
+            const profileUrl = `/profile/${liker.id}`;
 
-              {/* Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+            return hasGoldAccess ? (
+              /* Unlocked Gold View - Entire Card is Clickable to User Profile */
+              <Link
+                key={idx}
+                href={profileUrl}
+                className="group relative aspect-[3/4.2] rounded-2xl overflow-hidden border border-border bg-card shadow-sm hover:shadow-xl hover:border-primary/50 transition-all duration-300 flex flex-col justify-end"
+              >
+                {/* Liker Photo */}
+                <img
+                  src={
+                    liker.primary_photo_url ||
+                    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80"
+                  }
+                  alt={liker.display_name}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
 
-              {!hasGoldAccess ? (
-                /* Locked Tier Overlay */
-                <div className="absolute inset-0 flex flex-col items-center justify-center p-3 text-center text-white bg-black/30 backdrop-blur-[2px]">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 border border-white/20 mb-2">
-                    <Lock className="h-4 w-4 text-amber-400" />
+                {/* Subtle Gradient Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+
+                {/* Card Info & View Profile CTA */}
+                <div className="relative z-10 p-3.5 text-white">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-sm font-black tracking-tight">{liker.display_name}, {liker.age}</p>
                   </div>
-                  <p className="text-xs font-bold">{liker.city}</p>
+                  <p className="text-[11px] text-gray-300 mt-0.5">{liker.city} • {liker.gender}</p>
+
+                  <div className="mt-2.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 text-white text-center text-xs font-bold shadow-md shadow-rose-500/25 group-hover:scale-[1.02] transition-transform flex items-center justify-center gap-1.5">
+                    <span>View Profile</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </div>
+                </div>
+              </Link>
+            ) : (
+              /* Locked Tier View - Clicking navigates to Subscription to unlock */
+              <Link
+                key={idx}
+                href="/subscription"
+                className="group relative aspect-[3/4.2] rounded-2xl overflow-hidden border border-border bg-card shadow-sm hover:border-amber-500/50 transition-all"
+                title="Click to upgrade and unlock admirer"
+              >
+                {/* Blurred Photo */}
+                <img
+                  src={
+                    liker.primary_photo_url ||
+                    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80"
+                  }
+                  alt=""
+                  className="w-full h-full object-cover blur-md scale-110 transition-transform group-hover:scale-115"
+                />
+
+                {/* Locked Tier Overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-3 text-center text-white bg-black/45 backdrop-blur-[2px] group-hover:bg-black/55 transition-colors">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/70 border border-amber-400/30 mb-2 shadow-lg group-hover:scale-110 transition-transform">
+                    <Lock className="h-5 w-5 text-amber-400" />
+                  </div>
+                  <p className="text-xs font-bold tracking-tight">{liker.city}</p>
                   <p className="text-[10px] text-gray-300 mt-0.5">Liked you recently</p>
+                  <span className="mt-2.5 text-[10px] font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                    Tap to Reveal
+                  </span>
                 </div>
-              ) : (
-                /* Unlocked Gold View */
-                <div className="absolute bottom-3 left-3 right-3 text-white">
-                  <p className="text-sm font-bold">{liker.display_name}, {liker.age}</p>
-                  <p className="text-[11px] text-gray-300">{liker.city}</p>
-                  <Link
-                    href={`/profile/${liker.id}`}
-                    className="mt-2 block w-full py-1 text-center rounded-lg bg-primary text-white text-[11px] font-bold"
-                  >
-                    View Profile
-                  </Link>
-                </div>
-              )}
-            </div>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       )}
 

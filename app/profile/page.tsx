@@ -12,7 +12,8 @@ import {
   Coffee,
   ShieldCheck,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Eye
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { getMemberId } from "@/lib/utils/member-id";
@@ -151,6 +152,14 @@ export default function ProfilePage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Link
+              href={`/profile/${user.id}`}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors"
+              title="Preview how other members see your public card"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Preview Card</span>
+            </Link>
             <button
               onClick={() => {
                 setDisplayName(user.display_name);

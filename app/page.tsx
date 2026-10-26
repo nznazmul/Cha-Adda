@@ -225,10 +225,10 @@ export default function LandingPage() {
             Join thousands of adults discovering genuine matches on CHA ADDA today.
           </p>
           <Link
-            href="/register"
+            href={user ? "/discover" : "/register"}
             className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500 px-8 py-4 text-base font-bold text-white shadow-xl shadow-rose-500/30 hover:scale-105 active:scale-95 transition-all"
           >
-            <span>Get Started — It&apos;s Free</span>
+            <span>{user ? "Continue Exploring" : "Get Started — It's Free"}</span>
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

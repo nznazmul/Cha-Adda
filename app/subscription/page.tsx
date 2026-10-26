@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
 import { 
   Sparkles, 
@@ -11,6 +13,7 @@ import {
   ShieldCheck, 
   X, 
   ArrowRight,
+  ArrowLeft,
   CheckCircle2
 } from "lucide-react";
 
@@ -28,6 +31,7 @@ interface MicroPack {
 }
 
 export default function SubscriptionPage() {
+  const router = useRouter();
   const [currency, setCurrency] = useState<"bdt" | "usd">("bdt");
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionTier>("gold");
   const [upgradedNotice, setUpgradedNotice] = useState<string | null>(null);
@@ -168,6 +172,26 @@ export default function SubscriptionPage() {
 
   return (
     <div className="container max-w-5xl mx-auto px-4 py-8 sm:py-12">
+      {/* Top Back Navigation Bar */}
+      <div className="flex items-center justify-between mb-6">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-secondary text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back</span>
+        </button>
+
+        <Link
+          href="/likes"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+        >
+          <span>Likes You</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+
       {/* Header */}
       <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20 mb-3">
@@ -208,9 +232,25 @@ export default function SubscriptionPage() {
         </div>
 
         {upgradedNotice && (
-          <div className="mt-4 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-bold animate-in fade-in slide-in-from-top-2 flex items-center justify-center gap-2">
-            <CheckCircle2 className="h-4 w-4" />
-            <span>{upgradedNotice}</span>
+          <div className="mt-5 p-4 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-bold animate-in fade-in slide-in-from-top-2 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span>{upgradedNotice}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/likes"
+                className="px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold shadow-sm transition-all"
+              >
+                View Who Liked You Now →
+              </Link>
+              <Link
+                href="/discover"
+                className="px-4 py-1.5 rounded-xl border border-emerald-500/30 bg-card hover:bg-secondary text-foreground text-xs font-semibold transition-colors"
+              >
+                Discover
+              </Link>
+            </div>
           </div>
         )}
       </div>

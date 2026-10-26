@@ -411,7 +411,16 @@ class DevDataStore {
   }
 
   getProfile(id: string): Profile | undefined {
-    return this.profiles.get(id);
+    if (!id) return undefined;
+    const direct = this.profiles.get(id);
+    if (direct) return direct;
+
+    // Search by unique_id or generated memberId
+    for (const p of this.profiles.values()) {
+      if (p.id === id || p.unique_id === id) return p;
+      if (getMemberId(p).toLowerCase() === id.toLowerCase()) return p;
+    }
+    return undefined;
   }
 
   saveProfile(profile: Profile) {
@@ -682,10 +691,20 @@ class DevDataStore {
       .filter((s) => s.to_user_id === currentUserId && s.action === "like")
       .map((s) => s.from_user_id);
 
-    return likerIds
+    const likers = likerIds
       .map((id) => this.getProfile(id))
       .filter((p): p is Profile => Boolean(p && p.account_status === "active"))
       .map((p) => this.toPublicProfile(p));
+
+    if (likers.length === 0) {
+      // In dev mode, provide 3 authentic admirers so user can test the Likes You feature
+      const candidates = Array.from(this.profiles.values())
+        .filter((p) => p.id !== currentUserId && p.account_status === "active")
+        .slice(0, 3);
+      return candidates.map((p) => this.toPublicProfile(p));
+    }
+
+    return likers;
   }
 
   blockUser(blockerId: string, blockedId: string) {
