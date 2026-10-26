@@ -10,7 +10,9 @@ import {
   ShieldCheck, 
   AlertCircle, 
   Sparkles,
-  Upload
+  Upload,
+  SwitchCamera,
+  Play
 } from "lucide-react";
 
 interface SelfieCameraModalProps {
@@ -24,62 +26,152 @@ export function SelfieCameraModal({
   onClose,
   onSubmitSelfie,
 }: SelfieCameraModalProps) {
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [isStreaming, setIsStreaming] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
+  const [isVideoPaused, setIsVideoPaused] = useState(false);
+  const [availableDevices, setAvailableDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
+  // Clean shutdown of hardware camera tracks
   const stopCamera = useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      setStream(null);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (err) {
+          console.warn("Track stop error:", err);
+        }
+      });
+      streamRef.current = null;
     }
-  }, [stream]);
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsStreaming(false);
+    setIsVideoPaused(false);
+  }, []);
 
-  const startCamera = useCallback(async () => {
+  // Multi-tier camera initialization with auto-fallback
+  const startCamera = useCallback(async (deviceIdOverride?: string) => {
+    stopCamera();
     setCameraError(null);
     setIsInitializing(true);
+    setIsVideoPaused(false);
+
+    // Secure context & WebRTC check
+    if (typeof window === "undefined" || !navigator?.mediaDevices?.getUserMedia) {
+      setIsInitializing(false);
+      const isSecure = typeof window !== "undefined" && window.isSecureContext;
+      setCameraError(
+        !isSecure
+          ? "ব্রাউজার সিকিউরিটি নীতির কারণে সরাসরি ক্যামেরা ব্যবহারের জন্য HTTPS প্রয়োজন। আপনি নিচের বাটন দিয়ে সরাসরি সেলফি ছবি আপলোড বা মোবাইলের ক্যামেরা দিয়ে ছবি নিতে পারবেন।"
+          : "আপনার ব্রাউজারে সরাসরি ক্যামেরা সাপোর্ট পাওয়া যায়নি। অনুগ্রহ করে নিচের ফাইল আপলোড অপশনটি ব্যবহার করুন।"
+      );
+      return;
+    }
+
+    const attachStreamToVideo = (stream: MediaStream) => {
+      streamRef.current = stream;
+      setIsStreaming(true);
+
+      const video = videoRef.current;
+      if (video) {
+        video.srcObject = stream;
+        video.muted = true;
+        video.defaultMuted = true;
+        video.setAttribute("playsinline", "true");
+        video.setAttribute("webkit-playsinline", "true");
+
+        video.onloadedmetadata = () => {
+          video.play().catch((err) => {
+            console.warn("video.play() rejected:", err);
+            setIsVideoPaused(true);
+          });
+        };
+
+        // Immediate play attempt
+        video.play().catch(() => {
+          setIsVideoPaused(true);
+        });
+      }
+
+      // Enumerate cameras if supported
+      navigator.mediaDevices.enumerateDevices().then((devices) => {
+        const videoInputs = devices.filter((d) => d.kind === "videoinput");
+        setAvailableDevices(videoInputs);
+      }).catch(() => {});
+    };
 
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("আপনার ব্রাউজারে ক্যামেরা সাপোর্ট নেই। নিচে থেকে ছবি আপলোড করুন।");
+      let stream: MediaStream;
+
+      // Tier 1: Try specific device or front camera with relaxed resolution
+      try {
+        const constraints: MediaStreamConstraints = deviceIdOverride
+          ? {
+              video: {
+                deviceId: { exact: deviceIdOverride },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+              },
+              audio: false,
+            }
+          : {
+              video: {
+                facingMode: "user",
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+              },
+              audio: false,
+            };
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (tier1Err) {
+        console.warn("Tier 1 camera constraints failed, attempting fallback tier 2:", tier1Err);
+        // Tier 2: Basic video constraint (supports any Windows laptop/USB/virtual webcam)
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
       }
 
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 720 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      });
-
-      setStream(mediaStream);
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        await videoRef.current.play().catch(() => {});
-      }
+      attachStreamToVideo(stream);
     } catch (err: unknown) {
-      console.warn("Camera access error:", err);
-      const msg =
-        err instanceof Error && err.name === "NotAllowedError"
-          ? "ক্যামেরার অনুমতি দেওয়া হয়নি। ব্রাউজার সেটিংসে গিয়ে ক্যামেরার অনুমতি দিন অথবা ছবি আপলোড করুন।"
-          : "ক্যামেরা ওপেন করা সম্ভব হয়নি। নিচের অপশন থেকে সেলফি ছবি আপলোড করুন।";
+      console.error("Camera access error:", err);
+      let msg = "ক্যামেরা ওপেন করা সম্ভব হয়নি। নিচের অপশন থেকে সেলফি ছবি আপলোড করুন।";
+
+      if (err instanceof DOMException) {
+        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+          msg = "ক্যামেরার অনুমতি দেওয়া হয়নি। অনুগ্রহ করে ব্রাউজারের অ্যাড্রেস বারের ক্যামেরা/লক আইকন (🔒 বা 📷) থেকে ক্যামেরা 'Allow' করুন অথবা নিচে থেকে সেলফি ছবি সিলেক্ট করুন।";
+        } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
+          msg = "ক্যামেরাটি অন্য কোনো সফটওয়্যার (যেমন Zoom/Meet বা অন্য কোনো ব্রাউজার ট্যাব) এ চালু রয়েছে। অনুগ্রহ করে অন্য অ্যাপ বন্ধ করে আবার চেষ্টা করুন, অথবা সরাসরি ছবি আপলোড করুন।";
+        } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+          msg = "আপনার ডিভাইসে কোনো ক্যামেরা পাওয়া যায়নি। অনুগ্রহ করে নিচের অপশন থেকে ছবি আপলোড করুন।";
+        } else if (err.name === "OverconstrainedError") {
+          msg = "ক্যামেরার সেটিংস সাপোর্ট করছে না। নিচের আপলোড বাটন দিয়ে সেলফি জমা দিন।";
+        }
+      }
+
       setCameraError(msg);
     } finally {
       setIsInitializing(false);
     }
-  }, []);
+  }, [stopCamera]);
 
+  // Main lifecycle: only re-triggers when isOpen changes
   useEffect(() => {
-    if (isOpen && !capturedPhoto && !submittedSuccess) {
+    if (isOpen) {
+      setCapturedPhoto(null);
+      setSubmittedSuccess(false);
       startCamera();
     } else {
       stopCamera();
@@ -88,25 +180,20 @@ export function SelfieCameraModal({
     return () => {
       stopCamera();
     };
-  }, [isOpen, capturedPhoto, submittedSuccess, startCamera, stopCamera]);
-
-  // Keep video source synced if stream changes
-  useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().catch(() => {});
-    }
-  }, [stream]);
+  }, [isOpen, startCamera, stopCamera]);
 
   if (!isOpen) return null;
 
   const handleCapture = () => {
-    if (!videoRef.current) return;
-
     const video = videoRef.current;
+    if (!video) return;
+
+    const w = video.videoWidth || video.clientWidth || 640;
+    const h = video.videoHeight || video.clientHeight || 480;
+
     const canvas = canvasRef.current || document.createElement("canvas");
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 640;
+    canvas.width = w;
+    canvas.height = h;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -116,15 +203,34 @@ export function SelfieCameraModal({
     ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
     setCapturedPhoto(dataUrl);
+
+    // Stop hardware camera tracks while reviewing
     stopCamera();
   };
 
   const handleRetake = () => {
     setCapturedPhoto(null);
     setSubmittedSuccess(false);
-    startCamera();
+    startCamera(selectedDeviceId || undefined);
+  };
+
+  const handleSwitchDevice = () => {
+    if (availableDevices.length <= 1) return;
+    const currentIndex = availableDevices.findIndex((d) => d.deviceId === selectedDeviceId);
+    const nextIndex = (currentIndex + 1) % availableDevices.length;
+    const nextDevice = availableDevices[nextIndex];
+    setSelectedDeviceId(nextDevice.deviceId);
+    startCamera(nextDevice.deviceId);
+  };
+
+  const handleManualPlay = () => {
+    if (videoRef.current) {
+      videoRef.current.play().then(() => {
+        setIsVideoPaused(false);
+      }).catch(() => {});
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,7 +263,7 @@ export function SelfieCameraModal({
             colors: ["#38bdf8", "#3b82f6", "#10b981"],
           });
         } catch {
-          // Safe
+          // Confetti fallback
         }
         setTimeout(() => {
           onClose();
@@ -209,7 +315,7 @@ export function SelfieCameraModal({
           </button>
         </div>
 
-        {/* Hidden Canvas & File Input */}
+        {/* Hidden Canvas & Native Camera / File Input */}
         <canvas ref={canvasRef} className="hidden" />
         <input
           ref={fileInputRef}
@@ -290,22 +396,25 @@ export function SelfieCameraModal({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl bg-primary text-white text-xs font-bold shadow-sm hover:opacity-95"
+                    className="inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl bg-primary text-white text-xs font-bold shadow-sm hover:opacity-95 transition-all"
                   >
                     <Upload className="h-4 w-4" />
-                    <span>সেলফি ছবি ফাইল আপলোড করুন</span>
+                    <span>সেলফি ছবি আপলোড / ক্যামেরা খুলুন</span>
                   </button>
                   <button
                     type="button"
-                    onClick={startCamera}
-                    className="text-xs text-muted-foreground hover:text-foreground underline"
+                    onClick={() => startCamera(selectedDeviceId || undefined)}
+                    className="text-xs text-muted-foreground hover:text-foreground underline pt-1"
                   >
-                    ক্যামেরা পুনরায় চেষ্টা করুন
+                    ক্যামেরা পুনরায় চেষ্টা করুন 🔄
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="relative aspect-square rounded-2xl overflow-hidden border-2 border-sky-500/40 bg-black shadow-lg">
+              <div 
+                onClick={handleManualPlay}
+                className="relative aspect-square rounded-2xl overflow-hidden border-2 border-sky-500/40 bg-black shadow-lg"
+              >
                 {/* Live Video Feed */}
                 <video
                   ref={videoRef}
@@ -326,16 +435,36 @@ export function SelfieCameraModal({
                     <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
                     <span>লাইভ ক্যামেরা সক্রিয়</span>
                   </span>
-                  <span className="bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 text-[10px] text-sky-300">
-                    সোজা তাকান
-                  </span>
+                  
+                  {availableDevices.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSwitchDevice();
+                      }}
+                      className="pointer-events-auto bg-black/60 hover:bg-black/80 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/15 text-[10px] text-sky-300 flex items-center gap-1 transition-colors"
+                      title="ক্যামেরা পরিবর্তন করুন"
+                    >
+                      <SwitchCamera className="h-3 w-3" />
+                      <span>ক্যামেরা পরিবর্তন</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Loading indicator */}
                 {isInitializing && (
-                  <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center gap-2 text-white text-xs">
+                  <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center gap-2 text-white text-xs">
                     <Sparkles className="h-6 w-6 animate-spin text-sky-400" />
-                    <span>ক্যামেরা প্রস্তুত হচ্ছে...</span>
+                    <span>ক্যামেরা চালু করা হচ্ছে...</span>
+                  </div>
+                )}
+
+                {/* Video Paused Overlay (Click to Play fallback) */}
+                {isVideoPaused && !isInitializing && (
+                  <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2 text-white text-xs p-4 text-center cursor-pointer">
+                    <Play className="h-8 w-8 text-sky-400 fill-sky-400/30 animate-pulse" />
+                    <span className="font-semibold">ভিডিও চালু করতে এখানে ট্যাপ করুন</span>
                   </div>
                 )}
               </div>
@@ -344,14 +473,14 @@ export function SelfieCameraModal({
             {!cameraError && (
               <div className="space-y-3">
                 <p className="text-[11px] text-muted-foreground text-center">
-                  বৃত্তাকার ফ্রেমের ভেতরে মুখ সোজা রেখে নিচের বোতাম চাপুন।
+                  বৃত্তাকার ফ্রেমের ভেতরে মুখ রেখে নিচের বোতামটি চাপুন।
                 </p>
 
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={handleCapture}
-                    disabled={isInitializing || !stream}
+                    disabled={isInitializing || !isStreaming}
                     className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow-md shadow-sky-500/25 transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
                   >
                     <Camera className="h-4 w-4" />
@@ -361,7 +490,7 @@ export function SelfieCameraModal({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    title="ফাইল থেকে আপলোড করুন"
+                    title="ফাইল থেকে সেলফি আপলোড করুন"
                     className="p-3 rounded-2xl border border-border bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
                   >
                     <Upload className="h-4 w-4" />
