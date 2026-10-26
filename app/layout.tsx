@@ -68,11 +68,20 @@ export const metadata: Metadata = {
     siteName: "CHA ADDA (cha-adda-meet-swap)",
     title: "CHA ADDA — Modern 18+ Dating & Matchmaking Platform (cha-adda-meet-swap)",
     description: "Spark real connections over authentic dates. Swipe, match, and chat safely in real-time on cha-adda-meet-swap.",
+    images: [
+      {
+        url: "/logo.png",
+        width: 600,
+        height: 550,
+        alt: "CHA ADDA — Meet. Swap. Connect.",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "CHA ADDA — Modern 18+ Dating & Matchmaking Platform (cha-adda-meet-swap)",
     description: "Discover real connections nearby. Safe, verified, real-time dating platform on cha-adda-meet-swap.",
+    images: ["/logo.png"],
   },
   robots: {
     index: true,

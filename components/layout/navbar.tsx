@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { 
   Flame, 
@@ -50,16 +51,23 @@ export function Navbar() {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md transition-colors">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-rose-600 to-amber-500 shadow-md shadow-rose-500/20 group-hover:scale-105 transition-transform">
-            <Flame className="h-6 w-6 text-white" />
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-rose-500/10 to-amber-500/10 border border-rose-500/20 p-1 shadow-sm group-hover:scale-105 transition-transform overflow-hidden">
+            <Image
+              src="/logo-icon.png"
+              alt="CHA ADDA Logo"
+              width={40}
+              height={40}
+              className="h-full w-full object-contain"
+              priority
+            />
           </div>
           <div className="flex flex-col">
             <span className="font-extrabold tracking-tight text-xl leading-none gradient-text-primary">
               CHA ADDA
             </span>
             <span className="text-[10px] tracking-wider text-muted-foreground uppercase font-semibold">
-              Find Your Match
+              Meet. Swap. Connect.
             </span>
           </div>
         </Link>

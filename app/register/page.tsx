@@ -2,8 +2,9 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Flame, Mail, Lock, AlertCircle, ArrowRight, Check } from "lucide-react";
+import { Mail, Lock, AlertCircle, ArrowRight, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/providers/auth-context";
 
@@ -77,8 +78,15 @@ export default function RegisterPage() {
       <div className="w-full max-w-md space-y-6 rounded-3xl border border-border/80 bg-card p-6 sm:p-10 shadow-xl backdrop-blur-md">
         {/* Header */}
         <div className="text-center">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-rose-600 to-amber-500 shadow-md shadow-rose-500/25 mb-4">
-            <Flame className="h-6 w-6 text-white" />
+          <div className="relative inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-rose-500/10 to-amber-500/10 border border-rose-500/20 p-2 shadow-lg shadow-rose-500/10 mb-4 overflow-hidden">
+            <Image
+              src="/logo-icon.png"
+              alt="CHA ADDA Logo"
+              width={64}
+              height={64}
+              className="h-full w-full object-contain"
+              priority
+            />
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Create your account</h2>
           <p className="mt-2 text-xs sm:text-sm text-muted-foreground">

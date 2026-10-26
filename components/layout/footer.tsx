@@ -2,7 +2,8 @@
 
 import React from "react";
 import Link from "next/link";
-import { Flame, Shield, HeartHandshake, Lock, FileText } from "lucide-react";
+import Image from "next/image";
+import { Shield, HeartHandshake, Lock, FileText } from "lucide-react";
 
 export function Footer() {
   return (
@@ -11,16 +12,22 @@ export function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Logo & Tagline */}
           <div className="flex flex-col items-center md:items-start gap-1">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-rose-600 to-amber-500 shadow-sm">
-                <Flame className="h-4 w-4 text-white" />
+            <div className="flex items-center gap-2.5">
+              <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-rose-500/10 to-amber-500/10 border border-rose-500/20 p-0.5 overflow-hidden">
+                <Image
+                  src="/logo-icon.png"
+                  alt="CHA ADDA Logo"
+                  width={32}
+                  height={32}
+                  className="h-full w-full object-contain"
+                />
               </div>
               <span className="font-extrabold text-base tracking-tight gradient-text-primary">
                 CHA ADDA
               </span>
             </div>
             <p className="text-xs text-muted-foreground text-center md:text-left">
-              Real dates. Meaningful connections. Strict 18+ verified community.
+              Meet. Swap. Connect. Real dates & meaningful connections. Strict 18+ verified community.
             </p>
           </div>
 

@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { 
   Flame, 
@@ -36,6 +37,20 @@ export default function LandingPage() {
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gradient-to-tr from-rose-600/20 via-pink-600/10 to-amber-500/15 blur-[120px] pointer-events-none rounded-full" />
 
         <div className="mx-auto max-w-5xl text-center relative z-10 flex flex-col items-center">
+          {/* Brand Logo Emblem */}
+          <div className="relative mb-5 flex items-center justify-center group">
+            <div className="relative h-20 w-20 sm:h-24 sm:w-24 rounded-3xl bg-gradient-to-tr from-rose-500/15 via-rose-500/10 to-amber-500/10 border border-rose-500/30 p-2.5 shadow-2xl shadow-rose-500/20 backdrop-blur-md group-hover:scale-105 transition-transform duration-300">
+              <Image
+                src="/logo-icon.png"
+                alt="CHA ADDA Logo"
+                width={96}
+                height={96}
+                className="h-full w-full object-contain drop-shadow-md"
+                priority
+              />
+            </div>
+          </div>
+
           {/* Top Pill Badge */}
           <div className="inline-flex items-center gap-2 rounded-full border border-rose-500/30 bg-rose-500/10 px-4 py-1.5 text-xs font-semibold text-rose-400 mb-6 backdrop-blur-md">
             <Sparkles className="h-3.5 w-3.5" />
