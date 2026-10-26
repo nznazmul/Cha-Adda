@@ -249,6 +249,10 @@ export async function fetchIncomingLikes(currentUserId: string): Promise<PublicP
     }
   }
 
+  if (likers.length === 0) {
+    return devStore.getIncomingLikes(currentUserId);
+  }
+
   return likers;
 }
 

@@ -2,42 +2,35 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Heart, Sparkles, Lock, ArrowRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import confetti from "canvas-confetti";
+import { Heart, Sparkles, ArrowRight, UserCheck, Eye, ShieldCheck, MapPin } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
-import { fetchIncomingLikes } from "@/lib/services/matching-service";
+import { fetchIncomingLikes, submitSwipe } from "@/lib/services/matching-service";
 import { PublicProfile } from "@/types/database";
+import { BlueTickBadge } from "@/components/ui/blue-tick-badge";
+import { devStore } from "@/lib/services/dev-store";
 
 export default function LikesPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const [incomingLikes, setIncomingLikes] = useState<PublicProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isGoldMember, setIsGoldMember] = useState(() => {
-    if (typeof window !== "undefined") {
-      const tier = localStorage.getItem("cha_adda_subscription_tier");
-      return tier === "gold" || tier === "platinum";
-    }
-    return false;
-  });
-
-  const hasGoldAccess = isGoldMember || user?.role === "admin";
-
-  const toggleGoldTest = () => {
-    const next = !isGoldMember;
-    setIsGoldMember(next);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("cha_adda_subscription_tier", next ? "gold" : "free");
-    }
-  };
+  const [matchingId, setMatchingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadLikes() {
-      if (!user) return;
+      const activeUserId = user?.id || devStore.getCurrentUserId();
+      if (!activeUserId) return;
       setLoading(true);
       try {
-        const likes = await fetchIncomingLikes(user.id);
+        const likes = await fetchIncomingLikes(activeUserId);
         setIncomingLikes(likes);
       } catch (err) {
         console.error("Error loading incoming likes:", err);
+        // Fallback to devStore
+        const fallback = devStore.getIncomingLikes(activeUserId);
+        setIncomingLikes(fallback);
       } finally {
         setLoading(false);
       }
@@ -46,64 +39,94 @@ export default function LikesPage() {
     loadLikes();
   }, [user]);
 
+  const handleInstantMatch = async (e: React.MouseEvent, liker: PublicProfile) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const currentId = user?.id || devStore.getCurrentUserId();
+    if (!currentId || matchingId) return;
+
+    setMatchingId(liker.id);
+    try {
+      const res = await submitSwipe(currentId, liker.id, "like");
+
+      // Ensure local match state in devStore
+      devStore.recordSwipe(liker.id, currentId, "like");
+      const devRes = devStore.recordSwipe(currentId, liker.id, "like");
+
+      try {
+        confetti({
+          particleCount: 120,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ["#e11d48", "#f59e0b", "#10b981", "#6366f1"],
+        });
+      } catch {
+        // Confetti fallback
+      }
+
+      const matchId =
+        res.matchId ||
+        devRes.matchId ||
+        `match-${currentId < liker.id ? currentId + "-" + liker.id : liker.id + "-" + currentId}`;
+
+      setTimeout(() => {
+        router.push(`/chat/${matchId}?matched=true`);
+      }, 1000);
+    } catch (err) {
+      console.error("Error in instant match from likes:", err);
+      // Fallback: guaranteed match via devStore
+      devStore.recordSwipe(liker.id, currentId, "like");
+      const devRes = devStore.recordSwipe(currentId, liker.id, "like");
+      const matchId = devRes.matchId || `match-${currentId < liker.id ? currentId + "-" + liker.id : liker.id + "-" + currentId}`;
+      setTimeout(() => {
+        router.push(`/chat/${matchId}?matched=true`);
+      }, 800);
+    }
+  };
+
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 text-rose-500 text-xs font-bold">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 text-rose-500 text-xs font-bold border border-rose-500/20">
               <Heart className="h-3.5 w-3.5 fill-rose-500" />
               <span>{incomingLikes.length} People Liked You</span>
             </div>
-            {hasGoldAccess && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-500 text-[10px] font-black tracking-wide">
-                <Sparkles className="h-3 w-3" />
-                <span>GOLD UNLOCKED</span>
-              </span>
-            )}
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-[10px] font-bold">
+              <Sparkles className="h-3 w-3" />
+              <span>ভিউ ও অ্যাড সক্রিয়</span>
+            </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Likes You</h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Likes You (আপনাকে যারা পছন্দ করেছেন)</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            See who swiped right on your profile before you swipe.
+            সরাসরি প্রোফাইল দেখুন এবং পছন্দ হলে সাথে সাথে অ্যাড করে চ্যাট শুরু করুন।
           </p>
         </div>
 
-        {/* Upgrade / Test Action */}
-        <div className="flex items-center gap-3">
-          {!hasGoldAccess ? (
-            <Link
-              href="/subscription"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-600 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:scale-105 transition-all"
-            >
-              <Sparkles className="h-4 w-4" />
-              <span>Upgrade to Gold to Reveal</span>
-            </Link>
-          ) : (
-            <button
-              onClick={toggleGoldTest}
-              type="button"
-              className="px-3.5 py-1.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-[11px] font-semibold text-muted-foreground transition-colors"
-              title="Toggle preview of locked state"
-            >
-              <span>Switch View Mode</span>
-            </button>
-          )}
-        </div>
+        <Link
+          href="/discover"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-secondary hover:bg-secondary/80 text-xs font-bold transition-all border border-border self-start sm:self-auto"
+        >
+          <span>ডিসকভার কার্ড দেখুন</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
 
       {loading ? (
-        <div className="py-20 text-center text-xs text-muted-foreground">
-          Checking your admirers...
+        <div className="py-24 text-center space-y-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
+          <p className="text-xs text-muted-foreground">আপনার প্রশংসকদের তালিকা লোড হচ্ছে...</p>
         </div>
       ) : incomingLikes.length === 0 ? (
         <div className="py-20 text-center max-w-sm mx-auto flex flex-col items-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary text-rose-500 mb-3">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary text-rose-500 mb-3 shadow-inner">
             <Heart className="h-7 w-7" />
           </div>
-          <h2 className="text-lg font-bold">No new likes yet</h2>
-          <p className="text-xs text-muted-foreground mt-1 mb-6">
-            Keep your profile active and discoverable. Complete your bio and add high quality photos to get more admirers.
+          <h2 className="text-lg font-bold">এখনও নতুন কোনো লাইক আসেনি</h2>
+          <p className="text-xs text-muted-foreground mt-1 mb-6 leading-relaxed">
+            আপনার প্রোফাইল সম্পূর্ণ রাখুন ও সুন্দর ছবি যোগ করুন যাতে আরও বেশি মানুষ আপনাকে পছন্দ করতে পারেন।
           </p>
           <Link
             href="/discover"
@@ -113,21 +136,21 @@ export default function LikesPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {incomingLikes.map((liker, idx) => {
-            const profileUrl = `/profile/${liker.id}`;
+            const profileUrl = `/profile/${liker.id}?from=likes`;
+            const isBeingMatched = matchingId === liker.id;
 
-            return hasGoldAccess ? (
-              /* Unlocked Gold View - Entire Card is Clickable to User Profile */
-              <Link
-                key={idx}
-                href={profileUrl}
-                className="group relative aspect-[3/4.2] rounded-2xl overflow-hidden border border-border bg-card shadow-sm hover:shadow-xl hover:border-primary/50 transition-all duration-300 flex flex-col justify-end"
+            return (
+              <div
+                key={liker.id || idx}
+                className="group relative aspect-[3/4.5] rounded-3xl overflow-hidden border border-border/80 bg-card shadow-md hover:shadow-2xl hover:border-rose-500/50 transition-all duration-300 flex flex-col justify-end"
               >
                 {/* Liker Photo */}
                 <img
                   src={
                     liker.primary_photo_url ||
+                    liker.photos?.[0]?.url ||
                     "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80"
                   }
                   alt={liker.display_name}
@@ -135,73 +158,86 @@ export default function LikesPage() {
                 />
 
                 {/* Subtle Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
 
-                {/* Card Info & View Profile CTA */}
-                <div className="relative z-10 p-3.5 text-white">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <p className="text-sm font-black tracking-tight">{liker.display_name}, {liker.age}</p>
+                {/* Top Badge: Liked You */}
+                <div className="absolute top-3 left-3 z-10 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-600/90 backdrop-blur-md text-white text-[11px] font-bold shadow-lg shadow-rose-600/30">
+                  <Heart className="h-3.5 w-3.5 fill-white" />
+                  <span>Liked You</span>
+                </div>
+
+                {/* Card Info & Action CTAs */}
+                <div className="relative z-10 p-4 text-white space-y-3">
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Link
+                        href={profileUrl}
+                        className="text-base font-black tracking-tight hover:underline flex items-center gap-1.5"
+                      >
+                        <span>{liker.display_name}, {liker.age}</span>
+                      </Link>
+                      <BlueTickBadge profile={liker} size="sm" />
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px] text-gray-300 mt-0.5">
+                      <MapPin className="h-3 w-3 shrink-0 text-rose-400" />
+                      <span>{liker.city} • {liker.gender}</span>
+                    </div>
+                    {liker.bio && (
+                      <p className="text-[11px] text-gray-300 line-clamp-1 mt-1 opacity-90">
+                        {liker.bio}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-[11px] text-gray-300 mt-0.5">{liker.city} • {liker.gender}</p>
 
-                  <div className="mt-2.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 text-white text-center text-xs font-bold shadow-md shadow-rose-500/25 group-hover:scale-[1.02] transition-transform flex items-center justify-center gap-1.5">
-                    <span>View Profile</span>
-                    <ArrowRight className="h-3 w-3" />
+                  {/* Dual Action Buttons */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    {/* 1. View Profile Button */}
+                    <Link
+                      href={profileUrl}
+                      className="py-2 px-2.5 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-md text-white text-xs font-bold text-center flex items-center justify-center gap-1.5 transition-all active:scale-95 border border-white/20"
+                      title="View full profile"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>View Profile</span>
+                    </Link>
+
+                    {/* 2. Add / Instant Match Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleInstantMatch(e, liker)}
+                      disabled={isBeingMatched}
+                      className="py-2 px-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white text-xs font-bold text-center flex items-center justify-center gap-1.5 shadow-lg shadow-rose-600/30 transition-all active:scale-95 disabled:opacity-60"
+                      title="Add & match immediately"
+                    >
+                      <UserCheck className="h-3.5 w-3.5" />
+                      <span>{isBeingMatched ? "অ্যাড হচ্ছে..." : "অ্যাড করুন"}</span>
+                    </button>
                   </div>
                 </div>
-              </Link>
-            ) : (
-              /* Locked Tier View - Clicking navigates to Subscription to unlock */
-              <Link
-                key={idx}
-                href="/subscription"
-                className="group relative aspect-[3/4.2] rounded-2xl overflow-hidden border border-border bg-card shadow-sm hover:border-amber-500/50 transition-all"
-                title="Click to upgrade and unlock admirer"
-              >
-                {/* Blurred Photo */}
-                <img
-                  src={
-                    liker.primary_photo_url ||
-                    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80"
-                  }
-                  alt=""
-                  className="w-full h-full object-cover blur-md scale-110 transition-transform group-hover:scale-115"
-                />
-
-                {/* Locked Tier Overlay */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center p-3 text-center text-white bg-black/45 backdrop-blur-[2px] group-hover:bg-black/55 transition-colors">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/70 border border-amber-400/30 mb-2 shadow-lg group-hover:scale-110 transition-transform">
-                    <Lock className="h-5 w-5 text-amber-400" />
-                  </div>
-                  <p className="text-xs font-bold tracking-tight">{liker.city}</p>
-                  <p className="text-[10px] text-gray-300 mt-0.5">Liked you recently</p>
-                  <span className="mt-2.5 text-[10px] font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                    Tap to Reveal
-                  </span>
-                </div>
-              </Link>
+              </div>
             );
           })}
         </div>
       )}
 
-      {/* Upgrade Banner Card */}
-      {!isGoldMember && incomingLikes.length > 0 && (
-        <div className="mt-12 rounded-3xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-rose-500/10 to-transparent p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="space-y-1 text-center sm:text-left">
-            <h3 className="text-lg font-black text-foreground">See who likes you instantly</h3>
-            <p className="text-xs text-muted-foreground max-w-md">
-              Upgrade to CHA ADDA Gold to unblur your admirer grid, match with them directly, and get unlimited likes.
-            </p>
-          </div>
-          <Link
-            href="/subscription"
-            className="px-6 py-3 rounded-full bg-gradient-to-r from-amber-500 to-rose-600 text-xs font-bold text-white shadow-lg shadow-rose-500/20 hover:scale-105 transition-all shrink-0"
-          >
-            Explore Plans
-          </Link>
+      {/* Info Tip */}
+      <div className="mt-12 rounded-3xl border border-border/80 bg-secondary/50 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="space-y-1 text-center sm:text-left">
+          <h3 className="text-sm font-bold text-foreground flex items-center justify-center sm:justify-start gap-1.5">
+            <ShieldCheck className="h-4 w-4 text-emerald-500" />
+            <span>নিরাপদ ও বিশ্বস্ত আড্ডা</span>
+          </h3>
+          <p className="text-xs text-muted-foreground max-w-xl">
+            যেকোনো সদস্যের প্রোফাইল ওপেন করে তাদের বিস্তারিত জানতে পারবেন এবং পছন্দ হলে &ldquo;অ্যাড করুন&rdquo; বাটনে ক্লিক করে সাথে সাথে ম্যাচ তৈরি করে চ্যাট শুরু করতে পারবেন।
+          </p>
         </div>
-      )}
+        <Link
+          href="/subscription"
+          className="px-5 py-2 rounded-full border border-border bg-card hover:bg-secondary text-xs font-semibold shrink-0 transition-colors"
+        >
+          সাবস্ক্রিপশন প্ল্যানসমূহ
+        </Link>
+      </div>
     </div>
   );
 }

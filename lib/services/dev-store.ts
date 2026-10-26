@@ -701,6 +701,19 @@ class DevDataStore {
       const candidates = Array.from(this.profiles.values())
         .filter((p) => p.id !== currentUserId && p.account_status === "active")
         .slice(0, 3);
+
+      for (const c of candidates) {
+        if (!this.swipes.some((s) => s.from_user_id === c.id && s.to_user_id === currentUserId)) {
+          this.swipes.push({
+            id: `swp-incoming-${c.id}-${Date.now()}`,
+            from_user_id: c.id,
+            to_user_id: currentUserId,
+            action: "like",
+            created_at: new Date(Date.now() - 3600000).toISOString(),
+          });
+        }
+      }
+
       return candidates.map((p) => this.toPublicProfile(p));
     }
 

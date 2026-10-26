@@ -28,75 +28,79 @@ export async function GET(
     // 2. If Supabase is configured, search profiles table
     const { isSupabaseConfigured } = getAppEnv();
     if (isSupabaseConfigured) {
-      const adminClient = createAdminClient();
+      try {
+        const adminClient = createAdminClient();
 
-      // Check if decodedId is UUID or unique_id
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decodedId);
+        // Check if decodedId is UUID or unique_id
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decodedId);
 
-      let query = adminClient
-        .from("profiles")
-        .select(`
-          id,
-          unique_id,
-          display_name,
-          date_of_birth,
-          gender,
-          orientation,
-          bio,
-          city,
-          job_title,
-          education,
-          height_cm,
-          dating_intentions,
-          interests,
-          languages,
-          verified,
-          verified_until,
-          account_status,
-          role
-        `);
+        let query = adminClient
+          .from("profiles")
+          .select(`
+            id,
+            unique_id,
+            display_name,
+            date_of_birth,
+            gender,
+            orientation,
+            bio,
+            city,
+            job_title,
+            education,
+            height_cm,
+            dating_intentions,
+            interests,
+            languages,
+            verified,
+            verified_until,
+            account_status,
+            role
+          `);
 
-      if (isUUID) {
-        query = query.eq("id", decodedId);
-      } else {
-        query = query.or(`id.eq.${decodedId},unique_id.eq.${decodedId}`);
-      }
+        if (isUUID) {
+          query = query.eq("id", decodedId);
+        } else {
+          query = query.or(`id.eq.${decodedId},unique_id.eq.${decodedId}`);
+        }
 
-      const { data: profileRow, error } = await query.maybeSingle();
+        const { data: profileRow, error } = await query.maybeSingle();
 
-      if (!error && profileRow) {
-        // Fetch user photos
-        const { data: photos } = await adminClient
-          .from("profile_photos")
-          .select("*")
-          .eq("user_id", profileRow.id)
-          .order("is_primary", { ascending: false });
+        if (!error && profileRow) {
+          // Fetch user photos
+          const { data: photos } = await adminClient
+            .from("profile_photos")
+            .select("*")
+            .eq("user_id", profileRow.id)
+            .order("is_primary", { ascending: false });
 
-        const calculatedAge = calculateAge(profileRow.date_of_birth || "2000-01-01");
-        const age = Math.max(18, isNaN(calculatedAge) ? 18 : calculatedAge);
+          const calculatedAge = calculateAge(profileRow.date_of_birth || "2000-01-01");
+          const age = Math.max(18, isNaN(calculatedAge) ? 18 : calculatedAge);
 
-        const publicProfile: PublicProfile = {
-          id: profileRow.id,
-          unique_id: profileRow.unique_id,
-          display_name: profileRow.display_name,
-          age,
-          gender: profileRow.gender,
-          orientation: profileRow.orientation,
-          bio: profileRow.bio,
-          city: profileRow.city,
-          job_title: profileRow.job_title,
-          education: profileRow.education,
-          height_cm: profileRow.height_cm,
-          dating_intentions: profileRow.dating_intentions || [],
-          interests: profileRow.interests || [],
-          languages: profileRow.languages || [],
-          verified: profileRow.verified,
-          verified_until: profileRow.verified_until,
-          photos: photos || [],
-          primary_photo_url: photos?.[0]?.url,
-        };
+          const publicProfile: PublicProfile = {
+            id: profileRow.id,
+            unique_id: profileRow.unique_id,
+            display_name: profileRow.display_name,
+            age,
+            gender: profileRow.gender,
+            orientation: profileRow.orientation,
+            bio: profileRow.bio,
+            city: profileRow.city,
+            job_title: profileRow.job_title,
+            education: profileRow.education,
+            height_cm: profileRow.height_cm,
+            dating_intentions: profileRow.dating_intentions || [],
+            interests: profileRow.interests || [],
+            languages: profileRow.languages || [],
+            verified: profileRow.verified,
+            verified_until: profileRow.verified_until,
+            photos: photos || [],
+            primary_photo_url: photos?.[0]?.url,
+          };
 
-        return NextResponse.json({ profile: publicProfile });
+          return NextResponse.json({ profile: publicProfile });
+        }
+      } catch (supaErr) {
+        console.warn("Supabase profile fetch error in /api/users/[userId], falling back:", supaErr);
       }
     }
 

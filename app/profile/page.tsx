@@ -13,7 +13,10 @@ import {
   ShieldCheck,
   Clock,
   AlertCircle,
-  Eye
+  Eye,
+  X,
+  ExternalLink,
+  MapPin
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { getMemberId } from "@/lib/utils/member-id";
@@ -28,6 +31,7 @@ import { devStore } from "@/lib/services/dev-store";
 export default function ProfilePage() {
   const { user, updateCurrentProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [jobTitle, setJobTitle] = useState("");
@@ -152,14 +156,15 @@ export default function ProfilePage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link
-              href={`/profile/${user.id}`}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors"
+            <button
+              type="button"
+              onClick={() => setShowPreviewModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
               title="Preview how other members see your public card"
             >
               <Eye className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Preview Card</span>
-            </Link>
+              <span>Preview Card</span>
+            </button>
             <button
               onClick={() => {
                 setDisplayName(user.display_name);
@@ -476,6 +481,126 @@ export default function ProfilePage() {
         onClose={() => setShowVerificationModal(false)}
         onSubmitSelfie={handleSelfieSubmit}
       />
+
+      {/* Live Public Card Preview Modal */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-3xl bg-card border border-border/80 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-border flex items-center justify-between bg-card/90">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="text-xs font-bold">পাবলিক কার্ড প্রিভিউ (Live Card Preview)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPreviewModal(false)}
+                className="h-8 w-8 rounded-full hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Scrollable Card Body */}
+            <div className="p-4 overflow-y-auto space-y-4">
+              {/* Photo & Overlaid Info */}
+              <div className="relative aspect-[3/3.8] rounded-2xl overflow-hidden border border-border/60 bg-secondary shadow-md">
+                <img
+                  src={avatarUrl}
+                  alt={user.display_name}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent" />
+                <div className="absolute bottom-3 left-3 right-3 text-white">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h2 className="text-xl font-black">{user.display_name}, {age}</h2>
+                    <BlueTickBadge profile={user} size="md" />
+                    <span className="rounded-full bg-rose-500/90 border border-white/20 px-2 py-0.5 text-[9px] font-bold text-white tracking-wide">
+                      ID: {memberId}
+                    </span>
+                  </div>
+                  <p className="text-xs text-rose-200 mt-0.5 flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    <span>{user.city} • {user.gender}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Bio & Details */}
+              <div className="space-y-3 px-1 text-xs">
+                {user.bio ? (
+                  <div>
+                    <h4 className="font-bold uppercase text-[10px] text-muted-foreground mb-0.5">About Me</h4>
+                    <p className="text-foreground leading-relaxed">{user.bio}</p>
+                  </div>
+                ) : (
+                  <p className="italic text-muted-foreground">কোনো বায়ো এখনো যোগ করা হয়নি।</p>
+                )}
+
+                {(user.job_title || user.education) && (
+                  <div className="p-2.5 rounded-xl bg-secondary/60 text-foreground text-xs space-y-1">
+                    {user.job_title && <p>💼 {user.job_title}</p>}
+                    {user.education && <p>🎓 {user.education}</p>}
+                  </div>
+                )}
+
+                {user.dating_intentions && user.dating_intentions.length > 0 && (
+                  <div>
+                    <h4 className="font-bold uppercase text-[10px] text-muted-foreground mb-1">Dating Intentions</h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {user.dating_intentions.map((d) => (
+                        <span key={d} className="px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[11px] font-medium">
+                          🎯 {d}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {user.interests && user.interests.length > 0 && (
+                  <div>
+                    <h4 className="font-bold uppercase text-[10px] text-muted-foreground mb-1">Interests</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {user.interests.map((it) => (
+                        <span key={it} className="px-2 py-0.5 rounded-full bg-secondary text-foreground text-[11px]">
+                          {it}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2 pt-1">
+                  <h4 className="font-bold uppercase text-[10px] text-muted-foreground">Conversation Starters</h4>
+                  <div className="p-3 rounded-2xl bg-secondary/40 border border-border/60 text-xs space-y-1">
+                    <p className="font-semibold text-rose-500">“আমার পারফেক্ট শুক্রবারের আড্ডা...”</p>
+                    <p className="text-foreground/90">{prompt1}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="p-3 border-t border-border flex items-center justify-between gap-2 bg-secondary/30">
+              <Link
+                href={`/profile/${user.id}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-secondary text-xs font-semibold transition-colors"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                <span>পূর্ণাঙ্গ পেজে ভিউ</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowPreviewModal(false)}
+                className="px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:opacity-95"
+              >
+                বন্ধ করুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
