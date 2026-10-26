@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Flame, Mail, Lock, AlertCircle, ArrowRight, ShieldCheck } from "lucide-react";
+import { Flame, Mail, Lock, AlertCircle, ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 import { useAuth } from "@/components/providers/auth-context";
@@ -158,32 +158,8 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Test Admin Quick Fill Helper */}
-        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3.5 text-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-primary flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4" /> টেস্ট অ্যাডমিন অ্যাকাউন্ট
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setEmail("admin@chaadda.com");
-                setPassword("Admin@123456");
-                setError(null);
-              }}
-              className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all shadow-xs"
-            >
-              Auto-Fill
-            </button>
-          </div>
-          <div className="text-[11px] text-muted-foreground flex flex-col gap-0.5">
-            <div><strong className="text-foreground">Email:</strong> admin@chaadda.com</div>
-            <div><strong className="text-foreground">Password:</strong> Admin@123456</div>
-          </div>
-        </div>
-
         {/* Registration Link */}
-        <div className="text-center text-xs text-muted-foreground pt-1">
+        <div className="text-center text-xs text-muted-foreground pt-2">
           Don’t have an account yet?{" "}
           <Link href="/register" className="font-semibold text-primary hover:underline">
             Create account
