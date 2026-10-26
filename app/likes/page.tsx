@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
 import { Heart, Sparkles, ArrowRight, UserCheck, Eye, ShieldCheck, MapPin } from "lucide-react";
-import { useAuth } from "@/components/providers/auth-context";
-import { fetchIncomingLikes, submitSwipe } from "@/lib/services/matching-service";
+import { fetchIncomingLikes, submitSwipe, ensureUserMatch } from "@/lib/services/matching-service";
 import { PublicProfile } from "@/types/database";
 import { BlueTickBadge } from "@/components/ui/blue-tick-badge";
 import { devStore } from "@/lib/services/dev-store";
@@ -47,11 +46,7 @@ export default function LikesPage() {
 
     setMatchingId(liker.id);
     try {
-      const res = await submitSwipe(currentId, liker.id, "like");
-
-      // Ensure local match state in devStore
-      devStore.recordSwipe(liker.id, currentId, "like");
-      const devRes = devStore.recordSwipe(currentId, liker.id, "like");
+      const matchRes = await ensureUserMatch(liker.id);
 
       try {
         confetti({
@@ -64,22 +59,14 @@ export default function LikesPage() {
         // Confetti fallback
       }
 
-      const matchId =
-        res.matchId ||
-        devRes.matchId ||
-        `match-${currentId < liker.id ? currentId + "-" + liker.id : liker.id + "-" + currentId}`;
-
       setTimeout(() => {
-        router.push(`/chat/${matchId}?matched=true`);
-      }, 1000);
+        router.push(`/chat/${matchRes.matchId}?matched=true`);
+      }, 900);
     } catch (err) {
       console.error("Error in instant match from likes:", err);
-      // Fallback: guaranteed match via devStore
-      devStore.recordSwipe(liker.id, currentId, "like");
-      const devRes = devStore.recordSwipe(currentId, liker.id, "like");
-      const matchId = devRes.matchId || `match-${currentId < liker.id ? currentId + "-" + liker.id : liker.id + "-" + currentId}`;
+      const matchRes = await ensureUserMatch(liker.id);
       setTimeout(() => {
-        router.push(`/chat/${matchId}?matched=true`);
+        router.push(`/chat/${matchRes.matchId}?matched=true`);
       }, 800);
     }
   };

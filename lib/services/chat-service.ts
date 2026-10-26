@@ -17,13 +17,38 @@ export async function fetchMatchDetails(
   }
 
   const supabase = createClient();
-  const { data: match, error } = await supabase
-    .from("matches")
-    .select("id, user_a_id, user_b_id, status, created_at")
-    .eq("id", matchId)
-    .single();
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(matchId);
 
-  if (error || !match) {
+  let match: { id: string; user_a_id: string; user_b_id: string; status: string; created_at: string } | null = null;
+
+  if (isUUID) {
+    // 1. Try finding match by match id
+    const { data: matchById } = await supabase
+      .from("matches")
+      .select("id, user_a_id, user_b_id, status, created_at")
+      .eq("id", matchId)
+      .maybeSingle();
+
+    if (matchById) {
+      match = matchById;
+    } else {
+      // 2. Check if matchId is actually the other user's ID
+      const userA = currentUserId < matchId ? currentUserId : matchId;
+      const userB = currentUserId < matchId ? matchId : currentUserId;
+      const { data: matchByPair } = await supabase
+        .from("matches")
+        .select("id, user_a_id, user_b_id, status, created_at")
+        .eq("user_a_id", userA)
+        .eq("user_b_id", userB)
+        .maybeSingle();
+
+      if (matchByPair) {
+        match = matchByPair;
+      }
+    }
+  }
+
+  if (!match) {
     return devStore.getMatch(matchId, currentUserId) || null;
   }
 
@@ -32,7 +57,7 @@ export async function fetchMatchDetails(
     .from("profiles")
     .select("id, display_name, date_of_birth, gender, bio, city, job_title, education, dating_intentions, interests, languages")
     .eq("id", otherId)
-    .single();
+    .maybeSingle();
 
   const { data: photos } = await supabase
     .from("profile_photos")
@@ -123,10 +148,29 @@ export async function postChatMessage(
   }
 
   const supabase = createClient();
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(matchId);
+  let resolvedMatchId = matchId;
+
+  if (!isUUID && typeof window !== "undefined") {
+    try {
+      const ensureRes = await fetch("/api/matches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetUserId: matchId, createIfMissing: true }),
+      });
+      if (ensureRes.ok) {
+        const ed = await ensureRes.json();
+        if (ed.matchId) resolvedMatchId = ed.matchId;
+      }
+    } catch {
+      // Continue with current ID
+    }
+  }
+
   const { data, error } = await supabase
     .from("messages")
     .insert({
-      match_id: matchId,
+      match_id: resolvedMatchId,
       sender_id: senderId,
       content: encryptedContent,
       message_type: messageType,
@@ -137,7 +181,7 @@ export async function postChatMessage(
 
   if (error || !data) {
     console.error("Failed to post message to Supabase:", error);
-    const stored = devStore.sendMessage(matchId, senderId, encryptedContent, messageType, voiceDuration);
+    const stored = devStore.sendMessage(resolvedMatchId, senderId, encryptedContent, messageType, voiceDuration);
     return { ...stored, content: trimmed };
   }
 

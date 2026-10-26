@@ -20,8 +20,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { devStore } from "@/lib/services/dev-store";
-import { blockMember } from "@/lib/services/safety-service";
-import { submitSwipe, fetchPublicProfile, fetchIncomingLikes } from "@/lib/services/matching-service";
+import { submitSwipe, fetchPublicProfile, fetchIncomingLikes, ensureUserMatch } from "@/lib/services/matching-service";
 import { PublicProfile, Profile } from "@/types/database";
 import { getMemberId } from "@/lib/utils/member-id";
 import { calculateAge } from "@/lib/utils";
@@ -193,9 +192,7 @@ function PublicProfileViewContent() {
       const res = await submitSwipe(actorId, profile.id, "like");
 
       if (res.isMatch || isAdmirer) {
-        // Guarantee mutual match in devStore
-        devStore.recordSwipe(profile.id, actorId, "like");
-        const devRes = devStore.recordSwipe(actorId, profile.id, "like");
+        const matchRes = await ensureUserMatch(profile.id);
 
         setMatchSuccess(true);
         try {
@@ -203,33 +200,26 @@ function PublicProfileViewContent() {
             particleCount: 140,
             spread: 80,
             origin: { y: 0.6 },
-            colors: ["#e11d48", "#f59e0b", "#8b5cf6", "#10b981"]
+            colors: ["#e11d48", "#f59e0b", "#8b5cf6", "#10b981"],
           });
         } catch {
           // Confetti fallback
         }
 
-        const matchId =
-          res.matchId ||
-          devRes.matchId ||
-          `match-${actorId < profile.id ? actorId + "-" + profile.id : profile.id + "-" + actorId}`;
-
         setTimeout(() => {
-          router.push(`/chat/${matchId}?matched=true`);
-        }, 1200);
+          router.push(`/chat/${matchRes.matchId}?matched=true`);
+        }, 1100);
       } else {
         router.push("/discover");
       }
     } catch (err) {
       console.error("Error submitting like:", err);
       if (isAdmirer) {
-        devStore.recordSwipe(profile.id, actorId, "like");
-        const devRes = devStore.recordSwipe(actorId, profile.id, "like");
-        const matchId = devRes.matchId || `match-${actorId < profile.id ? actorId + "-" + profile.id : profile.id + "-" + actorId}`;
+        const matchRes = await ensureUserMatch(profile.id);
         setMatchSuccess(true);
         setTimeout(() => {
-          router.push(`/chat/${matchId}?matched=true`);
-        }, 1000);
+          router.push(`/chat/${matchRes.matchId}?matched=true`);
+        }, 900);
       } else {
         router.push("/discover");
       }

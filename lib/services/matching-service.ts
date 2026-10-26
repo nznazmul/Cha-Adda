@@ -87,7 +87,53 @@ export async function submitSwipe(
   };
 }
 
+export async function ensureUserMatch(
+  targetUserId: string
+): Promise<{ success: boolean; matchId: string }> {
+  try {
+    const res = await fetch("/api/matches", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetUserId, createIfMissing: true }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.matchId) {
+        return { success: true, matchId: data.matchId };
+      }
+    }
+  } catch (err) {
+    console.warn("ensureUserMatch API failed, using fallback:", err);
+  }
+
+  // Fallback to devStore
+  const currentId = devStore.getCurrentUserId();
+  devStore.recordSwipe(targetUserId, currentId, "like");
+  const devRes = devStore.recordSwipe(currentId, targetUserId, "like");
+  return {
+    success: true,
+    matchId:
+      devRes.matchId ||
+      `match-${currentId < targetUserId ? currentId + "-" + targetUserId : targetUserId + "-" + currentId}`,
+  };
+}
+
 export async function fetchUserMatches(currentUserId: string): Promise<Match[]> {
+  // 1. In browser, query /api/matches which runs with service role and hydrates everything reliably
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/matches");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.matches) && data.matches.length > 0) {
+          return data.matches;
+        }
+      }
+    } catch (apiErr) {
+      console.warn("Could not fetch matches via /api/matches, falling back:", apiErr);
+    }
+  }
+
   const { isSupabaseConfigured } = getAppEnv();
 
   if (!isSupabaseConfigured) {
