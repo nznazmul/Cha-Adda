@@ -138,6 +138,7 @@ bengaliFemaleBotsData.forEach((_, index) => {
   const userId = `bot-female-${String(index + 1).padStart(2, "0")}`;
   const photo1 = portraitPhotos[index % portraitPhotos.length];
   const photo2 = portraitPhotos[(index + 1) % portraitPhotos.length];
+  const photo3 = portraitPhotos[(index + 2) % portraitPhotos.length];
 
   bengaliFemalePhotos[userId] = [
     {
@@ -156,6 +157,16 @@ bengaliFemaleBotsData.forEach((_, index) => {
       storage_path: `bots/${userId}-secondary.jpg`,
       url: photo2,
       display_order: 1,
+      is_primary: false,
+      moderation_status: "approved",
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: `ph-bot-${index + 1}-3`,
+      user_id: userId,
+      storage_path: `bots/${userId}-tertiary.jpg`,
+      url: photo3,
+      display_order: 2,
       is_primary: false,
       moderation_status: "approved",
       created_at: new Date().toISOString(),

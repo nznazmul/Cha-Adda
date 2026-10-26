@@ -58,23 +58,25 @@ export async function fetchDiscoveryCandidates(
 export async function submitSwipe(
   actorId: string,
   targetId: string,
-  action: SwipeAction
+  action: SwipeAction,
+  inviteNote?: string,
+  inviteVenue?: string
 ): Promise<{ isMatch: boolean; matchId?: string }> {
   const { isSupabaseConfigured } = getAppEnv();
 
   if (!isSupabaseConfigured) {
-    return devStore.recordSwipe(actorId, targetId, action);
+    return devStore.recordSwipe(actorId, targetId, action, inviteNote, inviteVenue);
   }
 
   const supabase = createClient();
   const { data, error } = await supabase.rpc("record_swipe", {
     p_target_id: targetId,
-    p_action: action,
+    p_action: action === "tea_invite" ? "like" : action,
   });
 
   if (error) {
     console.error("Error recording swipe via RPC:", error);
-    return devStore.recordSwipe(actorId, targetId, action);
+    return devStore.recordSwipe(actorId, targetId, action, inviteNote, inviteVenue);
   }
 
   return {

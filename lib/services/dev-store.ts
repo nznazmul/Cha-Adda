@@ -1,4 +1,4 @@
-import { Profile, PublicProfile, ProfilePhoto, Swipe, Match, Message, Report, Notification, AdminAuditLog, PlatformSettings } from "@/types/database";
+import { Profile, PublicProfile, ProfilePhoto, Swipe, Match, Message, Report, Notification, AdminAuditLog, PlatformSettings, SwipeAction } from "@/types/database";
 import { bengaliFemaleProfiles, bengaliFemalePhotos } from "@/lib/data/bengali-bots";
 import { getMemberId, isMatchingMemberId } from "@/lib/utils/member-id";
 
@@ -343,6 +343,12 @@ class DevDataStore {
       dating_intentions: profile.dating_intentions || [],
       interests: profile.interests || [],
       languages: profile.languages || [],
+      prompts: profile.prompts || [
+        { id: "pr-1", question: "আমার পারফেক্ট শুক্রবারের আড্ডা...", answer: "এক কাপ কড়া দুধ চা আর চমৎকার কোনো জায়গায় প্রিয় মানুষের সাথে নির্ভেজাল গল্প।" },
+        { id: "pr-2", question: "যে বিষয়ে আমার সাথে ঘণ্টার পর ঘণ্টা তর্ক করা যাবে...", answer: "চা নাকি কফি, আর প্রিয় ভ্রমণ স্মৃতি নিয়ে!" },
+        { id: "pr-3", question: "আমার প্রিয় মিষ্টি বা স্ন্যাক্স...", answer: "চায়ের সাথে মুচমুচে গরম সিঙ্গাড়া অথবা বাকরখানি।" },
+      ],
+      verified: profile.verified ?? true,
       photos: userPhotos,
       primary_photo_url: primary ? primary.url : undefined,
     };
@@ -399,7 +405,13 @@ class DevDataStore {
     return results;
   }
 
-  recordSwipe(actorId: string, targetId: string, action: "like" | "pass"): { isMatch: boolean; matchId?: string } {
+  recordSwipe(
+    actorId: string,
+    targetId: string,
+    action: SwipeAction,
+    inviteNote?: string,
+    inviteVenue?: string
+  ): { isMatch: boolean; matchId?: string } {
     if (actorId === targetId) throw new Error("Cannot swipe on self");
 
     // Remove any previous swipe
@@ -419,9 +431,13 @@ class DevDataStore {
       return { isMatch: false };
     }
 
-    // Check reciprocal like
-    const reciprocal = this.swipes.find(
-      (s) => s.from_user_id === targetId && s.to_user_id === actorId && s.action === "like"
+    // Check reciprocal like or high-intent bot matching
+    const isBot = targetId.startsWith("bot-");
+    const reciprocal = isBot || this.swipes.find(
+      (s) =>
+        s.from_user_id === targetId &&
+        s.to_user_id === actorId &&
+        (s.action === "like" || s.action === "tea_invite" || s.action === "superlike")
     );
 
     if (reciprocal) {
@@ -445,6 +461,22 @@ class DevDataStore {
       } else {
         match.status = "active";
         match.unmatched_at = undefined;
+      }
+
+      // If this was a Tea Invite, add first message directly to match chat
+      if (action === "tea_invite") {
+        this.messages.push({
+          id: `msg-${Date.now()}`,
+          match_id: match.id,
+          sender_id: actorId,
+          content: inviteNote
+            ? `☕ চা খাওয়ার দাওয়াত (${inviteVenue || "ক্যাফে আড্ডা"}): "${inviteNote}"`
+            : `☕ এক কাপ গরম চায়ের দাওয়াত রইল! (${inviteVenue || "ক্যাফে আড্ডা"})`,
+          message_type: "tea_invite",
+          tea_venue: inviteVenue || "ক্যাফে আড্ডা",
+          tea_note: inviteNote || "",
+          created_at: new Date().toISOString(),
+        });
       }
 
       // Add notifications

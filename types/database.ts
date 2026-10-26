@@ -1,6 +1,6 @@
 export type UserRole = "user" | "moderator" | "admin";
 export type AccountStatus = "active" | "suspended" | "banned";
-export type SwipeAction = "like" | "pass";
+export type SwipeAction = "like" | "pass" | "superlike" | "tea_invite";
 export type MatchStatus = "active" | "unmatched" | "blocked";
 export type ReportCategory =
   | "harassment"
@@ -13,6 +13,12 @@ export type ReportCategory =
 export type ReportStatus = "pending" | "investigating" | "resolved" | "dismissed";
 export type NotificationType = "match" | "message" | "like" | "moderation" | "system";
 export type SubscriptionTier = "free" | "plus" | "gold" | "platinum";
+
+export interface ProfilePrompt {
+  id: string;
+  question: string;
+  answer: string;
+}
 
 export interface Profile {
   id: string;
@@ -31,6 +37,8 @@ export interface Profile {
   dating_intentions: string[];
   interests: string[];
   languages: string[];
+  prompts?: ProfilePrompt[];
+  verified?: boolean;
   is_discoverable: boolean;
   profile_complete: boolean;
   account_status: AccountStatus;
@@ -60,6 +68,8 @@ export interface PublicProfile {
   dating_intentions: string[];
   interests: string[];
   languages: string[];
+  prompts?: ProfilePrompt[];
+  verified?: boolean;
   photos: ProfilePhoto[];
   primary_photo_url?: string;
 }
@@ -111,6 +121,10 @@ export interface Message {
   match_id: string;
   sender_id: string;
   content: string;
+  message_type?: "text" | "voice" | "tea_invite";
+  voice_duration?: number;
+  tea_venue?: string;
+  tea_note?: string;
   created_at: string;
   read_at?: string | null;
   edited_at?: string | null;
