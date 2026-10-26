@@ -16,12 +16,14 @@ import {
   MessageCircle,
   CheckCircle2,
   SlidersHorizontal,
-  ChevronRight
+  ChevronRight,
+  Search
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
-import { fetchDiscoveryCandidates, submitSwipe } from "@/lib/services/matching-service";
+import { fetchDiscoveryCandidates, submitSwipe, searchMembers } from "@/lib/services/matching-service";
 import { PublicProfile } from "@/types/database";
 import { cn } from "@/lib/utils";
+import { getMemberId } from "@/lib/utils/member-id";
 
 export default function DiscoverPage() {
   const { user } = useAuth();
@@ -33,6 +35,12 @@ export default function DiscoverPage() {
     isOpen: false,
   });
   const [swipeFeedback, setSwipeFeedback] = useState<"like" | "pass" | null>(null);
+
+  // Search State for Member ID / Name Search
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<PublicProfile[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const isSearching = searchQuery.trim().length > 0;
 
   // Motion values for swipe gesture
   const x = useMotionValue(0);
@@ -57,6 +65,32 @@ export default function DiscoverPage() {
 
     loadCandidates();
   }, [user]);
+
+  // Search Debounced Effect
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setSearchLoading(true);
+      if (!user) {
+        setSearchLoading(false);
+        return;
+      }
+      try {
+        const results = await searchMembers(trimmed, user.id);
+        setSearchResults(results);
+      } catch (err) {
+        console.error("Search error:", err);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, user]);
 
   const currentCandidate = candidates[currentIndex];
 
@@ -122,7 +156,118 @@ export default function DiscoverPage() {
       {/* Top Ambient Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-rose-600/10 blur-[140px] pointer-events-none rounded-full" />
 
-      {loading ? (
+      {/* Top Search Bar for Member ID / Name Search */}
+      <div className="w-full max-w-sm mb-4 relative z-30">
+        <div className="relative flex items-center">
+          <Search className="absolute left-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by Member ID (e.g. CHA-...) or Name..."
+            className="w-full rounded-2xl border border-border/80 bg-card/90 py-2.5 pl-10 pr-9 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground/60 shadow-lg backdrop-blur-md focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {isSearching ? (
+        <div className="w-full max-w-sm flex-1 max-h-[580px] overflow-y-auto rounded-3xl border border-border/80 bg-card/95 p-4 shadow-2xl backdrop-blur-xl relative z-30 flex flex-col">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-border shrink-0">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              Search Results ({searchResults.length})
+            </span>
+            <button
+              onClick={() => setSearchQuery("")}
+              className="text-xs text-primary font-semibold hover:underline"
+            >
+              Back to Swipe
+            </button>
+          </div>
+
+          {searchLoading ? (
+            <div className="py-20 text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
+              <Sparkles className="h-6 w-6 animate-spin text-primary" />
+              <span>Searching member network...</span>
+            </div>
+          ) : searchResults.length === 0 ? (
+            <div className="py-16 text-center max-w-xs mx-auto">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary text-muted-foreground mb-3">
+                <Search className="h-6 w-6" />
+              </div>
+              <h4 className="text-sm font-bold">No members found</h4>
+              <p className="text-xs text-muted-foreground mt-1">
+                No active member matched &quot;{searchQuery}&quot;. Please verify the Member ID (e.g. CHA-XXXXX) or name.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3 overflow-y-auto">
+              {searchResults.map((member) => (
+                <div
+                  key={member.id}
+                  className="flex items-center justify-between p-3 rounded-2xl border border-border/60 bg-background/60 hover:bg-secondary/40 transition-all gap-3"
+                >
+                  <div
+                    onClick={() => setInspectProfile(member)}
+                    className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
+                  >
+                    <div className="relative h-12 w-12 rounded-xl overflow-hidden shrink-0 border border-border/80 bg-secondary">
+                      <img
+                        src={member.primary_photo_url || member.photos?.[0]?.url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80"}
+                        alt={member.display_name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-sm truncate text-foreground">
+                          {member.display_name}, {member.age}
+                        </span>
+                        <span className="rounded-full bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 text-[10px] font-bold text-rose-400">
+                          ID: {getMemberId(member)}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground truncate">
+                        {member.city} {member.job_title ? `• ${member.job_title}` : ""}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => setInspectProfile(member)}
+                      className="px-2.5 py-1.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-xs font-semibold text-foreground transition-colors"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!user) return;
+                        const res = await submitSwipe(user.id, member.id, "like");
+                        if (res.isMatch) {
+                          setMatchModal({ isOpen: true, matchId: res.matchId, matchedUser: member });
+                        }
+                        setSearchQuery("");
+                      }}
+                      className="p-2 rounded-xl bg-gradient-to-tr from-rose-600 to-amber-500 text-white hover:opacity-90 shadow-sm"
+                      title="Send Like"
+                    >
+                      <Heart className="h-4 w-4 fill-white" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : loading ? (
         <div className="flex flex-col items-center justify-center space-y-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary animate-pulse-glow">
             <Heart className="h-8 w-8 animate-bounce" />
@@ -215,11 +360,14 @@ export default function DiscoverPage() {
 
             {/* Profile Info Overlay */}
             <div className="absolute bottom-20 left-5 right-5 text-white pointer-events-none">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                   {currentCandidate.display_name}, {currentCandidate.age}
                 </h2>
                 <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                <span className="rounded-full bg-rose-500/80 border border-white/20 px-2 py-0.5 text-[10px] font-bold text-white tracking-wide shadow-sm">
+                  ID: {getMemberId(currentCandidate)}
+                </span>
               </div>
 
               <div className="flex items-center gap-3 text-xs text-rose-200 mt-1 font-medium">
@@ -326,7 +474,12 @@ export default function DiscoverPage() {
 
             <div className="mt-4 space-y-4">
               <div>
-                <h3 className="text-2xl font-extrabold">{inspectProfile.display_name}, {inspectProfile.age}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-2xl font-extrabold">{inspectProfile.display_name}, {inspectProfile.age}</h3>
+                  <span className="rounded-full bg-rose-500/15 border border-rose-500/30 px-2.5 py-0.5 text-[10px] font-bold text-rose-400">
+                    ID: {getMemberId(inspectProfile)}
+                  </span>
+                </div>
                 <p className="text-xs text-rose-500 font-semibold">{inspectProfile.city} • {inspectProfile.gender}</p>
               </div>
 

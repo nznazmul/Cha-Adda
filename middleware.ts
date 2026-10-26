@@ -32,7 +32,11 @@ export async function middleware(request: NextRequest) {
   });
 
   // Refresh session so user stays logged in across pages and reloads
-  await supabase.auth.getUser();
+  try {
+    await supabase.auth.getUser();
+  } catch (err) {
+    console.warn("Middleware session refresh warning:", err);
+  }
 
   return supabaseResponse;
 }

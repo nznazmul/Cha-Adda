@@ -18,6 +18,7 @@ import { devStore } from "@/lib/services/dev-store";
 import { blockMember } from "@/lib/services/safety-service";
 import { submitSwipe } from "@/lib/services/matching-service";
 import { PublicProfile } from "@/types/database";
+import { getMemberId } from "@/lib/utils/member-id";
 
 function PublicProfileViewContent() {
   const params = useParams();
@@ -117,7 +118,12 @@ function PublicProfileViewContent() {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
           <div className="absolute bottom-4 left-4 right-4 text-white">
-            <h1 className="text-2xl font-black">{profile.display_name}, {profile.age}</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-black">{profile.display_name}, {profile.age}</h1>
+              <span className="rounded-full bg-rose-500/90 border border-white/20 px-2 py-0.5 text-[10px] font-bold text-white tracking-wide shadow-sm">
+                ID: {getMemberId(profile)}
+              </span>
+            </div>
             <p className="text-xs text-rose-200 mt-0.5">{profile.city} • {profile.gender}</p>
           </div>
         </div>

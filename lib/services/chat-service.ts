@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getAppEnv } from "@/lib/config/env";
 import { devStore } from "@/lib/services/dev-store";
 import { Message, Match, PublicProfile } from "@/types/database";
+import { encryptMessage, decryptMessage } from "@/lib/security/e2ee";
 
 export async function fetchMatchDetails(
   matchId: string,
@@ -69,23 +70,34 @@ export async function fetchMatchDetails(
 export async function fetchConversationMessages(matchId: string): Promise<Message[]> {
   const { isSupabaseConfigured } = getAppEnv();
 
+  let rawMessages: Message[] = [];
   if (!isSupabaseConfigured) {
-    return devStore.getMessages(matchId);
+    rawMessages = devStore.getMessages(matchId);
+  } else {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("match_id", matchId)
+      .order("created_at", { ascending: true });
+
+    if (error || !data) {
+      console.error("Error fetching messages:", error);
+      rawMessages = devStore.getMessages(matchId);
+    } else {
+      rawMessages = data;
+    }
   }
 
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("messages")
-    .select("*")
-    .eq("match_id", matchId)
-    .order("created_at", { ascending: true });
+  // Decrypt all messages for the current conversation
+  const decrypted = await Promise.all(
+    rawMessages.map(async (msg) => ({
+      ...msg,
+      content: await decryptMessage(msg.content, matchId),
+    }))
+  );
 
-  if (error || !data) {
-    console.error("Error fetching messages:", error);
-    return devStore.getMessages(matchId);
-  }
-
-  return data;
+  return decrypted;
 }
 
 export async function postChatMessage(
@@ -97,10 +109,13 @@ export async function postChatMessage(
   if (!trimmed) throw new Error("Message content cannot be empty.");
   if (trimmed.length > 2000) throw new Error("Message exceeds 2000 characters limit.");
 
+  // Encrypt message before persistence with AES-GCM 256-bit
+  const encryptedContent = await encryptMessage(trimmed, matchId);
   const { isSupabaseConfigured } = getAppEnv();
 
   if (!isSupabaseConfigured) {
-    return devStore.sendMessage(matchId, senderId, trimmed);
+    const stored = devStore.sendMessage(matchId, senderId, encryptedContent);
+    return { ...stored, content: trimmed };
   }
 
   const supabase = createClient();
@@ -109,17 +124,18 @@ export async function postChatMessage(
     .insert({
       match_id: matchId,
       sender_id: senderId,
-      content: trimmed,
+      content: encryptedContent,
     })
     .select()
     .single();
 
   if (error || !data) {
     console.error("Failed to post message to Supabase:", error);
-    return devStore.sendMessage(matchId, senderId, trimmed);
+    const stored = devStore.sendMessage(matchId, senderId, encryptedContent);
+    return { ...stored, content: trimmed };
   }
 
-  return data;
+  return { ...data, content: trimmed };
 }
 
 export function subscribeToMatchMessages(
@@ -143,9 +159,13 @@ export function subscribeToMatchMessages(
         table: "messages",
         filter: `match_id=eq.${matchId}`,
       },
-      (payload: { new: Message }) => {
+      async (payload: { new: Message }) => {
         if (payload.new) {
-          onNewMessage(payload.new);
+          const decryptedContent = await decryptMessage(payload.new.content, matchId);
+          onNewMessage({
+            ...payload.new,
+            content: decryptedContent,
+          });
         }
       }
     )

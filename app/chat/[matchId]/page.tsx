@@ -14,7 +14,9 @@ import {
   Heart,
   Check,
   CheckCheck,
-  Info
+  Info,
+  Lock,
+  ShieldCheck
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { 
@@ -226,6 +228,12 @@ function ChatConversationContent() {
 
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+        {/* End-to-End Encryption Security Pill */}
+        <div className="mx-auto max-w-sm rounded-xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-1.5 text-center flex items-center justify-center gap-2 text-[11px] text-amber-500 font-medium shadow-sm backdrop-blur-sm">
+          <Lock className="h-3.5 w-3.5 shrink-0" />
+          <span>Messages are end-to-end encrypted (AES-256). Privacy & chat data leak protected.</span>
+        </div>
+
         {loading ? (
           <div className="py-20 text-center text-xs text-muted-foreground">
             Loading messages...

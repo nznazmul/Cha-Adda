@@ -4,13 +4,14 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Mail, Lock, AlertCircle, ArrowRight, Check } from "lucide-react";
+import { Mail, Lock, AlertCircle, ArrowRight, Check, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/providers/auth-context";
 
 export default function RegisterPage() {
   const router = useRouter();
   const { refreshAuth } = useAuth();
+  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -52,16 +53,28 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, displayName }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok || resData.error) {
+        setError(resData.error || "Failed to create account. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      // Immediately sign in so the user has an active session and cookies
       const supabase = createClient();
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (signUpError) {
-        setError(signUpError.message);
-        setLoading(false);
-        return;
+      if (signInError) {
+        console.warn("Immediate sign-in warning:", signInError);
       }
 
       await refreshAuth();
@@ -103,6 +116,25 @@ export default function RegisterPage() {
         )}
 
         <form onSubmit={handleRegister} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+              Full Name / Display Name
+            </label>
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted-foreground">
+                <User className="h-4 w-4" />
+              </div>
+              <input
+                type="text"
+                required
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="e.g. Tanvir"
+                className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
               Email Address

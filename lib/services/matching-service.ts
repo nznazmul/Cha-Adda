@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase/client";
 import { getAppEnv } from "@/lib/config/env";
 import { devStore } from "@/lib/services/dev-store";
 import { fetchPlatformSettings } from "@/lib/services/platform-settings-service";
-import { PublicProfile, Match, SwipeAction } from "@/types/database";
+import { PublicProfile, Match, SwipeAction, Profile, ProfilePhoto } from "@/types/database";
+import { getMemberId, isMatchingMemberId } from "@/lib/utils/member-id";
 
 export async function fetchDiscoveryCandidates(
   currentUserId: string,
@@ -240,4 +241,94 @@ export async function unmatchUser(matchId: string, currentUserId: string): Promi
     .or(`user_a_id.eq.${currentUserId},user_b_id.eq.${currentUserId}`);
 
   return !error;
+}
+
+export async function searchMembers(
+  query: string,
+  currentUserId: string
+): Promise<PublicProfile[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const { isSupabaseConfigured } = getAppEnv();
+
+  if (!isSupabaseConfigured) {
+    return devStore.searchMembers(trimmed, currentUserId);
+  }
+
+  try {
+    const supabase = createClient();
+    const { data: profiles, error } = await supabase
+      .from("profiles")
+      .select("id, display_name, date_of_birth, gender, orientation, bio, city, job_title, education, height_cm, dating_intentions, interests, languages")
+      .eq("is_discoverable", true)
+      .neq("id", currentUserId)
+      .limit(60);
+
+    if (error || !profiles || profiles.length === 0) {
+      return devStore.searchMembers(trimmed, currentUserId);
+    }
+
+    const qLower = trimmed.toLowerCase();
+    const matchedRows = ((profiles as Profile[]) || []).filter((p: Profile) => {
+      const mId = getMemberId(p);
+      const nameMatch = p.display_name?.toLowerCase().includes(qLower);
+      const cityMatch = p.city?.toLowerCase().includes(qLower);
+      const idMatch = isMatchingMemberId(trimmed, p.id, mId);
+      return Boolean(nameMatch || cityMatch || idMatch);
+    });
+
+    if (matchedRows.length === 0) {
+      return devStore.searchMembers(trimmed, currentUserId);
+    }
+
+    const matchedIds = matchedRows.map((p: Profile) => p.id);
+    const { data: photos } = await supabase
+      .from("profile_photos")
+      .select("*")
+      .in("user_id", matchedIds)
+      .order("is_primary", { ascending: false });
+
+    const photoMap = new Map<string, ProfilePhoto[]>();
+    (((photos as unknown as ProfilePhoto[]) || [])).forEach((ph: ProfilePhoto) => {
+      const list = photoMap.get(ph.user_id) || [];
+      list.push(ph);
+      photoMap.set(ph.user_id, list);
+    });
+
+    const today = new Date();
+    return matchedRows.map((row: Profile): PublicProfile => {
+      const birth = new Date(row.date_of_birth || "2000-01-01");
+      let age = today.getFullYear() - birth.getFullYear();
+      if (
+        today.getMonth() < birth.getMonth() ||
+        (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())
+      ) {
+        age--;
+      }
+      const userPhotos = photoMap.get(row.id) || [];
+
+      return {
+        id: row.id,
+        unique_id: getMemberId(row),
+        display_name: row.display_name,
+        age: Math.max(18, age),
+        gender: row.gender,
+        orientation: row.orientation,
+        bio: row.bio,
+        city: row.city,
+        job_title: row.job_title,
+        education: row.education,
+        height_cm: row.height_cm,
+        dating_intentions: row.dating_intentions || [],
+        interests: row.interests || [],
+        languages: row.languages || [],
+        photos: userPhotos,
+        primary_photo_url: userPhotos[0]?.url,
+      };
+    });
+  } catch (err) {
+    console.error("Error in searchMembers:", err);
+    return devStore.searchMembers(trimmed, currentUserId);
+  }
 }

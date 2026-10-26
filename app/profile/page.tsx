@@ -15,10 +15,13 @@ import {
   Plus,
   Trash2,
   Check,
-  Edit3
+  Edit3,
+  Copy,
+  CheckCheck
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { calculateAge } from "@/lib/utils";
+import { getMemberId } from "@/lib/utils/member-id";
 
 export default function ProfilePage() {
   const { user, updateCurrentProfile } = useAuth();
@@ -28,6 +31,7 @@ export default function ProfilePage() {
   const [jobTitle, setJobTitle] = useState(user?.job_title || "");
   const [city, setCity] = useState(user?.city || "");
   const [savedNotice, setSavedNotice] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
 
   if (!user) {
     return (
@@ -38,6 +42,13 @@ export default function ProfilePage() {
   }
 
   const age = calculateAge(user.date_of_birth);
+  const memberId = getMemberId(user);
+
+  const handleCopyId = () => {
+    navigator.clipboard.writeText(memberId);
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 2000);
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,6 +90,23 @@ export default function ProfilePage() {
               <p className="text-xs text-muted-foreground mt-0.5">
                 {user.city} • {user.gender}
               </p>
+
+              {/* Unique Member ID Badge */}
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-bold text-rose-400">
+                <span>ID: {memberId}</span>
+                <button
+                  type="button"
+                  onClick={handleCopyId}
+                  title="Copy Member ID"
+                  className="p-0.5 text-rose-400 hover:text-white transition-colors"
+                >
+                  {copiedId ? (
+                    <CheckCheck className="h-3 w-3 text-emerald-400" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 

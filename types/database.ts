@@ -16,6 +16,7 @@ export type SubscriptionTier = "free" | "plus" | "gold" | "platinum";
 
 export interface Profile {
   id: string;
+  unique_id?: string | null;
   display_name: string;
   date_of_birth: string; // ISO date YYYY-MM-DD (private)
   gender: "man" | "woman" | "nonbinary" | "other";
@@ -45,6 +46,7 @@ export interface Profile {
  */
 export interface PublicProfile {
   id: string;
+  unique_id?: string | null;
   display_name: string;
   age: number; // calculated from DOB, never exposes raw birth date
   gender: "man" | "woman" | "nonbinary" | "other";

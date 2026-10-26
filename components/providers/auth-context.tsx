@@ -11,6 +11,38 @@ import {
   AuthChangeEvent,
   Session
 } from "@supabase/supabase-js";
+import { generateMemberIdFromUuid, getMemberId } from "@/lib/utils/member-id";
+
+const LOCAL_STORAGE_USER_KEY = "cha_adda_auth_user";
+
+function getCachedUser(): Profile | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.id) {
+      if (!parsed.unique_id) parsed.unique_id = getMemberId(parsed);
+      return parsed as Profile;
+    }
+  } catch {
+    // Ignore JSON parse errors
+  }
+  return null;
+}
+
+function setCachedUser(profile: Profile | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (profile) {
+      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(profile));
+    } else {
+      localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+    }
+  } catch {
+    // Ignore storage quota errors
+  }
+}
 
 interface AuthContextType {
   user: Profile | null;
@@ -35,7 +67,33 @@ const AuthContext = createContext<AuthContextType>({
 async function getOrProvisionProfile(
   supabase: SupabaseClient,
   authUser: SupabaseAuthUser
-): Promise<Profile | null> {
+): Promise<Profile> {
+  const emailName = authUser.email ? authUser.email.split("@")[0] : "Member";
+  const displayName =
+    authUser.user_metadata?.display_name ||
+    authUser.user_metadata?.name ||
+    emailName;
+  const uniqueId =
+    authUser.user_metadata?.unique_id || generateMemberIdFromUuid(authUser.id);
+
+  const fallbackProfile: Profile = {
+    id: authUser.id,
+    unique_id: uniqueId,
+    display_name: displayName,
+    date_of_birth: "2000-01-01",
+    gender: "other",
+    city: "Dhaka",
+    role: authUser.email === "xprttanvir@gmail.com" ? "admin" : "user",
+    account_status: "active",
+    is_discoverable: true,
+    profile_complete: false,
+    dating_intentions: [],
+    interests: [],
+    languages: ["English", "Bengali"],
+    created_at: authUser.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
   try {
     const { data: existingProfile } = await supabase
       .from("profiles")
@@ -44,29 +102,27 @@ async function getOrProvisionProfile(
       .maybeSingle();
 
     if (existingProfile) {
-      return existingProfile as Profile;
+      return {
+        ...fallbackProfile,
+        ...existingProfile,
+        unique_id: getMemberId(existingProfile) || uniqueId,
+      } as Profile;
     }
 
     // Auto-provision initial profile if missing in database
-    const emailName = authUser.email ? authUser.email.split("@")[0] : "Member";
-    const displayName =
-      authUser.user_metadata?.display_name ||
-      authUser.user_metadata?.name ||
-      emailName;
-
-    const initialProfile: Partial<Profile> = {
+    const initialProfile = {
       id: authUser.id,
       display_name: displayName,
       date_of_birth: "2000-01-01",
       gender: "other",
       city: "Dhaka",
-      role: "user",
+      role: authUser.email === "xprttanvir@gmail.com" ? "admin" : "user",
       account_status: "active",
       is_discoverable: true,
       profile_complete: false,
       dating_intentions: [],
       interests: [],
-      languages: ["English"],
+      languages: ["English", "Bengali"],
     };
 
     const { data: inserted } = await supabase
@@ -76,26 +132,34 @@ async function getOrProvisionProfile(
       .maybeSingle();
 
     if (inserted) {
-      return inserted as Profile;
+      return {
+        ...(inserted as Profile),
+        unique_id: uniqueId,
+      };
     }
 
-    const { data: retryProfile } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", authUser.id)
-      .maybeSingle();
-
-    return (retryProfile || initialProfile) as Profile;
+    return fallbackProfile;
   } catch (err) {
-    console.error("Error retrieving or creating user profile:", err);
-    return null;
+    console.warn("Using authenticated fallback profile:", err);
+    return fallbackProfile;
   }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<Profile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUserState] = useState<Profile | null>(() => getCachedUser());
+  const [isLoading, setIsLoading] = useState(() => !getCachedUser());
   const { isSupabaseConfigured } = getAppEnv();
+
+  const setUser = useCallback(
+    (val: Profile | null | ((prev: Profile | null) => Profile | null)) => {
+      setUserState((prev) => {
+        const next = typeof val === "function" ? val(prev) : val;
+        setCachedUser(next);
+        return next;
+      });
+    },
+    []
+  );
 
   const refreshAuth = useCallback(async (): Promise<Profile | null> => {
     if (!isSupabaseConfigured) {
@@ -121,10 +185,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error("Auth refresh error:", err);
-      setUser(null);
-      return null;
+      return user;
     }
-  }, [isSupabaseConfigured]);
+  }, [isSupabaseConfigured, setUser, user]);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -168,6 +231,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             )
             .subscribe();
         } else {
+          // If no session found on server, clear cached user
           setUser(null);
         }
 
@@ -175,23 +239,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           data: { subscription },
         } = supabase.auth.onAuthStateChange(
           async (event: AuthChangeEvent, session: Session | null) => {
-          if (event === "PASSWORD_RECOVERY") {
-            window.location.href = "/reset-password";
-            return;
-          }
+            if (event === "PASSWORD_RECOVERY") {
+              window.location.href = "/reset-password";
+              return;
+            }
 
-          if (event === "SIGNED_OUT") {
-            setUser(null);
-            return;
-          }
+            if (event === "SIGNED_OUT") {
+              setUser(null);
+              return;
+            }
 
-          if (session?.user) {
-            const profile = await getOrProvisionProfile(supabase, session.user);
-            setUser(profile);
-          } else {
-            setUser(null);
+            if (session?.user) {
+              const profile = await getOrProvisionProfile(supabase, session.user);
+              setUser(profile);
+            }
           }
-        });
+        );
 
         unsubscribe = () => {
           subscription.unsubscribe();
@@ -199,7 +262,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       } catch (err) {
         console.error("Auth init error:", err);
-        setUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -210,7 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [isSupabaseConfigured]);
+  }, [isSupabaseConfigured, setUser]);
 
   const switchDevUser = (userId: string) => {
     devStore.setCurrentUserId(userId);
@@ -219,11 +281,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    if (isSupabaseConfigured) {
-      const supabase = createClient();
-      await supabase.auth.signOut();
-    }
     setUser(null);
+    setCachedUser(null);
+    if (isSupabaseConfigured) {
+      try {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.warn("Sign out error:", err);
+      }
+    }
   };
 
   const updateCurrentProfile = async (updates: Partial<Profile>) => {

@@ -1,5 +1,6 @@
 import { Profile, PublicProfile, ProfilePhoto, Swipe, Match, Message, Report, Notification, AdminAuditLog, PlatformSettings } from "@/types/database";
 import { bengaliFemaleProfiles, bengaliFemalePhotos } from "@/lib/data/bengali-bots";
+import { getMemberId, isMatchingMemberId } from "@/lib/utils/member-id";
 
 // Seed development profiles
 const initialProfiles: Profile[] = [
@@ -328,6 +329,7 @@ class DevDataStore {
 
     return {
       id: profile.id,
+      unique_id: getMemberId(profile),
       display_name: profile.display_name,
       age: Math.max(18, age),
       gender: profile.gender,
@@ -376,6 +378,25 @@ class DevDataStore {
       }
     }
     return candidates;
+  }
+
+  searchMembers(query: string, currentUserId: string): PublicProfile[] {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+
+    const results: PublicProfile[] = [];
+    for (const [id, p] of this.profiles.entries()) {
+      if (id === currentUserId) continue;
+      const mId = getMemberId(p);
+      const matchesName = p.display_name.toLowerCase().includes(q);
+      const matchesCity = (p.city || "").toLowerCase().includes(q);
+      const matchesId = isMatchingMemberId(query, id, mId);
+
+      if (matchesName || matchesCity || matchesId) {
+        results.push(this.toPublicProfile(p));
+      }
+    }
+    return results;
   }
 
   recordSwipe(actorId: string, targetId: string, action: "like" | "pass"): { isMatch: boolean; matchId?: string } {
