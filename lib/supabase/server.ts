@@ -3,7 +3,12 @@ import { cookies } from "next/headers";
 import { getAppEnv } from "@/lib/config/env";
 
 export async function createClient() {
-  const cookieStore = await cookies();
+  let cookieStore: Awaited<ReturnType<typeof cookies>> | null = null;
+  try {
+    cookieStore = await cookies();
+  } catch {
+    // In prerendering or non-request contexts, cookies() is not available
+  }
   const { supabaseUrl, supabaseAnonKey, isSupabaseConfigured } = getAppEnv();
 
   return createServerClient(
@@ -12,12 +17,13 @@ export async function createClient() {
     {
       cookies: {
         getAll() {
-          return cookieStore.getAll();
+          return cookieStore ? cookieStore.getAll() : [];
         },
         setAll(cookiesToSet) {
+          if (!cookieStore) return;
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore?.set(name, value, options)
             );
           } catch {
             // The `setAll` method was called from a Server Component.

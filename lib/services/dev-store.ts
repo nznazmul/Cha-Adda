@@ -415,10 +415,12 @@ class DevDataStore {
     const direct = this.profiles.get(id);
     if (direct) return direct;
 
-    // Search by unique_id or generated memberId
+    const lower = id.toLowerCase();
+    // Search by id, unique_id or generated memberId case-insensitively
     for (const p of this.profiles.values()) {
-      if (p.id === id || p.unique_id === id) return p;
-      if (getMemberId(p).toLowerCase() === id.toLowerCase()) return p;
+      if (p.id.toLowerCase() === lower) return p;
+      if (p.unique_id && p.unique_id.toLowerCase() === lower) return p;
+      if (getMemberId(p).toLowerCase() === lower) return p;
     }
     return undefined;
   }
@@ -655,9 +657,36 @@ class DevDataStore {
   }
 
   getMatch(matchId: string, currentUserId: string): Match | undefined {
-    const match = this.matches.find(
+    let match = this.matches.find(
       (m) => m.id === matchId && (m.user_a_id === currentUserId || m.user_b_id === currentUserId)
     );
+
+    if (!match) {
+      match = this.matches.find(
+        (m) =>
+          (m.user_a_id === currentUserId && matchId.includes(m.user_b_id)) ||
+          (m.user_b_id === currentUserId && matchId.includes(m.user_a_id))
+      );
+    }
+
+    if (!match && matchId.startsWith("match-")) {
+      for (const p of this.profiles.values()) {
+        if (p.id !== currentUserId && matchId.includes(p.id)) {
+          const user_a_id = currentUserId < p.id ? currentUserId : p.id;
+          const user_b_id = currentUserId < p.id ? p.id : currentUserId;
+          match = {
+            id: matchId,
+            user_a_id,
+            user_b_id,
+            status: "active",
+            created_at: new Date().toISOString(),
+          };
+          this.matches.push(match);
+          break;
+        }
+      }
+    }
+
     if (!match) return undefined;
 
     const otherId = match.user_a_id === currentUserId ? match.user_b_id : match.user_a_id;
@@ -674,12 +703,20 @@ class DevDataStore {
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   }
 
-  sendMessage(matchId: string, senderId: string, content: string): Message {
+  sendMessage(
+    matchId: string,
+    senderId: string,
+    content: string,
+    messageType: "text" | "voice" | "tea_invite" = "text",
+    voiceDuration?: number
+  ): Message {
     const msg: Message = {
       id: `msg-${Date.now()}`,
       match_id: matchId,
       sender_id: senderId,
       content,
+      message_type: messageType,
+      voice_duration: voiceDuration,
       created_at: new Date().toISOString(),
     };
     this.messages.push(msg);

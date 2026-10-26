@@ -105,7 +105,9 @@ export async function fetchConversationMessages(matchId: string): Promise<Messag
 export async function postChatMessage(
   matchId: string,
   senderId: string,
-  content: string
+  content: string,
+  messageType: "text" | "voice" | "tea_invite" = "text",
+  voiceDuration?: number
 ): Promise<Message> {
   const trimmed = content.trim();
   if (!trimmed) throw new Error("Message content cannot be empty.");
@@ -116,7 +118,7 @@ export async function postChatMessage(
   const { isSupabaseConfigured } = getAppEnv();
 
   if (!isSupabaseConfigured) {
-    const stored = devStore.sendMessage(matchId, senderId, encryptedContent);
+    const stored = devStore.sendMessage(matchId, senderId, encryptedContent, messageType, voiceDuration);
     return { ...stored, content: trimmed };
   }
 
@@ -127,17 +129,19 @@ export async function postChatMessage(
       match_id: matchId,
       sender_id: senderId,
       content: encryptedContent,
+      message_type: messageType,
+      voice_duration: voiceDuration,
     })
     .select()
     .single();
 
   if (error || !data) {
     console.error("Failed to post message to Supabase:", error);
-    const stored = devStore.sendMessage(matchId, senderId, encryptedContent);
+    const stored = devStore.sendMessage(matchId, senderId, encryptedContent, messageType, voiceDuration);
     return { ...stored, content: trimmed };
   }
 
-  return { ...data, content: trimmed };
+  return { ...data, content: trimmed, message_type: messageType, voice_duration: voiceDuration };
 }
 
 export function subscribeToMatchMessages(

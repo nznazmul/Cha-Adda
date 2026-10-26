@@ -60,7 +60,7 @@ export async function GET(
         if (isUUID) {
           query = query.eq("id", decodedId);
         } else {
-          query = query.or(`id.eq.${decodedId},unique_id.eq.${decodedId}`);
+          query = query.ilike("unique_id", decodedId);
         }
 
         const { data: profileRow, error } = await query.maybeSingle();
@@ -104,17 +104,17 @@ export async function GET(
       }
     }
 
-    // 3. Fallback: Search all devStore profiles by loose match (memberId or name)
-    const allCandidates = devStore.getDiscoveryCandidates("usr-temp-search");
-    const matched = allCandidates.find(
+    // 3. Fallback: Search all devStore profiles by loose match (memberId or unique_id or id)
+    const allProfiles = devStore.getAllProfiles();
+    const matched = allProfiles.find(
       (c) =>
-        c.id === decodedId ||
-        c.unique_id === decodedId ||
+        c.id.toLowerCase() === decodedId.toLowerCase() ||
+        (c.unique_id && c.unique_id.toLowerCase() === decodedId.toLowerCase()) ||
         getMemberId(c).toLowerCase() === decodedId.toLowerCase()
     );
 
     if (matched) {
-      return NextResponse.json({ profile: matched });
+      return NextResponse.json({ profile: devStore.toPublicProfile(matched) });
     }
 
     return NextResponse.json({ error: "User profile not found." }, { status: 404 });

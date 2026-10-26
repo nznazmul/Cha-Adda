@@ -5,7 +5,7 @@ import { devStore } from "@/lib/services/dev-store";
 import { AdminAnalyticsMetrics } from "@/types/database";
 
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { isSupabaseConfigured } = getAppEnv();
 

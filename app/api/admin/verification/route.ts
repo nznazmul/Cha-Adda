@@ -4,7 +4,7 @@ import { getAppEnv } from "@/lib/config/env";
 import { devStore } from "@/lib/services/dev-store";
 import { calculateVerificationExpiry, VerificationDurationPreset } from "@/lib/utils/verification";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { isSupabaseConfigured } = getAppEnv();
 

@@ -32,6 +32,7 @@ import { unmatchUser } from "@/lib/services/matching-service";
 import { blockMember } from "@/lib/services/safety-service";
 import { Message, PublicProfile, MeetingSpot } from "@/types/database";
 import { fetchActiveSpots } from "@/lib/services/meeting-spots-service";
+import { devStore } from "@/lib/services/dev-store";
 import { cn, formatDate } from "@/lib/utils";
 import { 
   playVoiceNote, 
@@ -113,28 +114,17 @@ function ChatConversationContent() {
       if (match?.other_user) {
         setPartner(match.other_user);
       } else {
-        // Fallback default partner for preview
-        setPartner({
-          id: "usr-kaelen-04",
-          display_name: "Kaelen Miller",
-          age: 28,
-          gender: "man",
-          city: "Dhaka",
-          bio: "Culinary explorer and jazz enthusiast.",
-          dating_intentions: ["Serious dating"],
-          interests: ["Cooking", "Music", "Travel"],
-          languages: ["English"],
-          photos: [{
-            id: "ph-1",
-            user_id: "usr-kaelen-04",
-            storage_path: "",
-            url: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=800&q=80",
-            display_order: 0,
-            is_primary: true,
-            moderation_status: "approved",
-            created_at: new Date().toISOString()
-          }]
-        });
+        // Dynamically find partner matching other user in matchId
+        const allProfiles = devStore.getAllProfiles();
+        const otherCandidate = allProfiles.find(
+          (p) => p.id !== user.id && matchId.includes(p.id)
+        );
+        if (otherCandidate) {
+          setPartner(devStore.toPublicProfile(otherCandidate));
+        } else {
+          const fallback = devStore.getDiscoveryCandidates(user.id)[0];
+          setPartner(fallback || devStore.toPublicProfile(allProfiles[0]));
+        }
       }
 
       // Fetch messages
@@ -241,14 +231,33 @@ function ChatConversationContent() {
     let audioBlob: Blob | null = null;
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       try {
-        mediaRecorderRef.current.stop();
-        if (audioChunksRef.current.length > 0) {
-          audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        }
+        const recorder = mediaRecorderRef.current;
+        const stopPromise = new Promise<Blob | null>((resolve) => {
+          recorder.onstop = () => {
+            const blob =
+              audioChunksRef.current.length > 0
+                ? new Blob(audioChunksRef.current, { type: "audio/webm" })
+                : null;
+            resolve(blob);
+          };
+          try {
+            recorder.stop();
+          } catch {
+            resolve(
+              audioChunksRef.current.length > 0
+                ? new Blob(audioChunksRef.current, { type: "audio/webm" })
+                : null
+            );
+          }
+        });
+        audioBlob = await stopPromise;
       } catch {
-        // Safe
+        // Safe fallback
       }
+    } else if (audioChunksRef.current.length > 0) {
+      audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
     }
+
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       mediaStreamRef.current = null;
@@ -257,9 +266,7 @@ function ChatConversationContent() {
     if (!user) return;
     try {
       const voiceContent = `🎙️ [Voice Note • ${duration}s]`;
-      const sentMsg = await postChatMessage(matchId, user.id, voiceContent);
-      sentMsg.message_type = "voice";
-      sentMsg.voice_duration = duration;
+      const sentMsg = await postChatMessage(matchId, user.id, voiceContent, "voice", duration);
 
       if (audioBlob) {
         const audioUrl = URL.createObjectURL(audioBlob);

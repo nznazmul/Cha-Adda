@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS: PlatformSettings = {
   maintenance_mode: false,
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   const { isSupabaseConfigured } = getAppEnv();
 
   if (!isSupabaseConfigured) {

@@ -45,7 +45,7 @@ async function verifyAdminAuth() {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const auth = await verifyAdminAuth();
     if (!auth.isAuthorized) {
