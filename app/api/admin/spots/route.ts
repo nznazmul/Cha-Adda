@@ -76,6 +76,47 @@ export async function GET(request: Request) {
       // Table may not exist yet
     }
 
+    // 2. Fallback: Query admin_audit_logs for spots created by admin in Supabase
+    try {
+      const { data: logs } = await adminClient
+        .from("admin_audit_logs")
+        .select("target_id, metadata, created_at")
+        .eq("action_type", "MEETING_SPOT_CREATED")
+        .order("created_at", { ascending: false });
+
+      if (logs && logs.length > 0) {
+        const auditSpots: MeetingSpot[] = logs.map((log) => {
+          const meta = (log.metadata || {}) as Record<string, unknown>;
+          return {
+            id: log.target_id || `spot-${Date.now()}`,
+            name: String(meta.name || "Safe Spot"),
+            area: String(meta.area || "Dhaka"),
+            city: String(meta.city || "Dhaka"),
+            address: meta.address ? String(meta.address) : null,
+            tip: meta.tip ? String(meta.tip) : null,
+            google_maps_url: meta.google_maps_url ? String(meta.google_maps_url) : null,
+            image_url: meta.image_url ? String(meta.image_url) : null,
+            is_active: meta.is_active !== undefined ? Boolean(meta.is_active) : true,
+            display_order: typeof meta.display_order === "number" ? meta.display_order : 0,
+            created_at: log.created_at,
+            updated_at: log.created_at,
+          };
+        });
+
+        // Merge with seed default spots without duplicates
+        const defaultSpots = devStore.getMeetingSpots(false);
+        const combined = [...auditSpots];
+        for (const ds of defaultSpots) {
+          if (!combined.some((s) => s.name.toLowerCase() === ds.name.toLowerCase())) {
+            combined.push(ds);
+          }
+        }
+        return NextResponse.json({ spots: combined });
+      }
+    } catch (logErr) {
+      console.warn("Could not read spots from audit logs:", logErr);
+    }
+
     return NextResponse.json({ spots: devStore.getMeetingSpots(false) });
   } catch (err: unknown) {
     console.error("GET /api/admin/spots error:", err);

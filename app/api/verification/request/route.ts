@@ -1,5 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { getAppEnv } from "@/lib/config/env";
 import { devStore } from "@/lib/services/dev-store";
 
@@ -20,11 +19,25 @@ export async function POST(request: NextRequest) {
     // 1. In devStore, always record for quick access
     const devReq = devStore.submitVerificationRequest(userId, selfieUrl);
 
-    // 2. In Supabase, record as audit log / verification log
+    // 2. In Supabase, record persistently via adminClient (service role bypasses user RLS)
     if (isSupabaseConfigured) {
       try {
-        const supabase = await createClient();
-        await supabase.from("admin_audit_logs").insert({
+        const adminClient = createAdminClient();
+
+        // Try direct insert into verification_requests table if created
+        try {
+          await adminClient.from("verification_requests").insert({
+            id: devReq.id,
+            user_id: userId,
+            selfie_url: selfieUrl,
+            status: "pending",
+          });
+        } catch {
+          // Table may not exist yet
+        }
+
+        // Always record in admin_audit_logs as persistent backup
+        await adminClient.from("admin_audit_logs").insert({
           admin_id: userId,
           action_type: "SELFIE_VERIFICATION_SUBMITTED",
           target_type: "verification_request",

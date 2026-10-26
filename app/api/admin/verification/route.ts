@@ -37,7 +37,77 @@ export async function GET(request: Request) {
       );
     }
 
-    // In dev store we maintain all active verification requests
+    // 1. Try querying verification_requests table in Supabase
+    const adminClient = createAdminClient();
+    try {
+      const { data, error } = await adminClient
+        .from("verification_requests")
+        .select(`
+          *,
+          user:profiles!verification_requests_user_id_fkey(id, display_name, city, date_of_birth, gender)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return NextResponse.json({ requests: data });
+      }
+    } catch {
+      // Table may not exist yet
+    }
+
+    // 2. Fallback: Query admin_audit_logs for selfie verification submissions
+    try {
+      const { data: logs } = await adminClient
+        .from("admin_audit_logs")
+        .select("*")
+        .eq("action_type", "SELFIE_VERIFICATION_SUBMITTED")
+        .order("created_at", { ascending: false });
+
+      if (logs && logs.length > 0) {
+        const userIds = logs.map((l) => (l.metadata as Record<string, unknown>)?.userId as string).filter(Boolean);
+        const { data: profiles } = await adminClient
+          .from("profiles")
+          .select("id, display_name, city, date_of_birth, gender")
+          .in("id", userIds);
+
+        const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+
+        const auditRequests = logs.map((log) => {
+          const meta = (log.metadata || {}) as Record<string, unknown>;
+          const uId = String(meta.userId || log.admin_id);
+          const p = profileMap.get(uId);
+          return {
+            id: String(meta.requestId || log.target_id || log.id),
+            user_id: uId,
+            selfie_url: String(meta.selfieUrl || ""),
+            status: String(meta.status || "pending") as "pending" | "approved" | "rejected",
+            created_at: log.created_at,
+            updated_at: log.created_at,
+            user: p ? {
+              id: p.id,
+              display_name: p.display_name,
+              city: p.city,
+              date_of_birth: p.date_of_birth,
+              gender: p.gender,
+            } : undefined,
+          };
+        });
+
+        // Merge with seed devStore requests
+        const devRequests = devStore.getVerificationRequests();
+        const combined = [...auditRequests];
+        for (const dr of devRequests) {
+          if (!combined.some((r) => r.id === dr.id)) {
+            combined.push(dr);
+          }
+        }
+        return NextResponse.json({ requests: combined });
+      }
+    } catch (logErr) {
+      console.warn("Could not read verification requests from audit logs:", logErr);
+    }
+
+    // Default fallback to dev store
     return NextResponse.json({ requests: devStore.getVerificationRequests() });
   } catch (err: unknown) {
     console.error("GET /api/admin/verification error:", err);

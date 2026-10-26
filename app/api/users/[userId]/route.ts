@@ -66,6 +66,14 @@ export async function GET(
         const { data: profileRow, error } = await query.maybeSingle();
 
         if (!error && profileRow) {
+          // If profile is banned or suspended, do not expose public profile
+          if (profileRow.account_status === "banned" || profileRow.account_status === "suspended") {
+            return NextResponse.json(
+              { error: "This profile is unavailable." },
+              { status: 404 }
+            );
+          }
+
           // Fetch user photos
           const { data: photos } = await adminClient
             .from("profile_photos")
@@ -114,6 +122,12 @@ export async function GET(
     );
 
     if (matched) {
+      if (matched.account_status === "banned" || matched.account_status === "suspended") {
+        return NextResponse.json(
+          { error: "This profile is unavailable." },
+          { status: 404 }
+        );
+      }
       return NextResponse.json({ profile: devStore.toPublicProfile(matched) });
     }
 
