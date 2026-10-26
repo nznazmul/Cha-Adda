@@ -167,20 +167,21 @@ export function SelfieCameraModal({
     }
   }, [stopCamera]);
 
-  // Main lifecycle: only re-triggers when isOpen changes
+  // Main lifecycle: starts camera on open/mount, cleans up hardware tracks on close/unmount
   useEffect(() => {
-    if (isOpen) {
-      setCapturedPhoto(null);
-      setSubmittedSuccess(false);
-      startCamera();
-    } else {
-      stopCamera();
-    }
+    let isCancelled = false;
+
+    Promise.resolve().then(() => {
+      if (!isCancelled) {
+        startCamera();
+      }
+    });
 
     return () => {
+      isCancelled = true;
       stopCamera();
     };
-  }, [isOpen, startCamera, stopCamera]);
+  }, [startCamera, stopCamera]);
 
   if (!isOpen) return null;
 

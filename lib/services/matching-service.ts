@@ -4,6 +4,8 @@ import { devStore } from "@/lib/services/dev-store";
 import { fetchPlatformSettings } from "@/lib/services/platform-settings-service";
 import { PublicProfile, Match, SwipeAction, Profile, ProfilePhoto } from "@/types/database";
 import { getMemberId, isMatchingMemberId } from "@/lib/utils/member-id";
+import { calculateAge } from "@/lib/utils";
+import { decryptMessage } from "@/lib/security/e2ee";
 
 export async function fetchDiscoveryCandidates(
   currentUserId: string,
@@ -89,7 +91,24 @@ export async function fetchUserMatches(currentUserId: string): Promise<Match[]> 
   const { isSupabaseConfigured } = getAppEnv();
 
   if (!isSupabaseConfigured) {
-    return devStore.getMatches(currentUserId);
+    const devMatches = devStore.getMatches(currentUserId);
+    return Promise.all(
+      devMatches.map(async (m) => {
+        if (!m.last_message) return m;
+        try {
+          const decrypted = await decryptMessage(m.last_message.content, m.id);
+          return {
+            ...m,
+            last_message: {
+              ...m.last_message,
+              content: decrypted,
+            },
+          };
+        } catch {
+          return m;
+        }
+      })
+    );
   }
 
   const supabase = createClient();
@@ -111,7 +130,7 @@ export async function fetchUserMatches(currentUserId: string): Promise<Match[]> 
     return devStore.getMatches(currentUserId);
   }
 
-  // Hydrate other user public profile
+  // Hydrate other user public profile and decrypt last message
   const results: Match[] = [];
   for (const m of matchesData) {
     const otherId = m.user_a_id === currentUserId ? m.user_b_id : m.user_a_id;
@@ -143,15 +162,24 @@ export async function fetchUserMatches(currentUserId: string): Promise<Match[]> 
       .limit(1);
 
     if (profile) {
-      const birth = new Date(profile.date_of_birth);
-      const age = Math.max(18, new Date().getFullYear() - birth.getFullYear());
+      const age = calculateAge(profile.date_of_birth);
+      let lastMsg = msgs?.[0] || null;
+
+      if (lastMsg && lastMsg.content) {
+        try {
+          const decrypted = await decryptMessage(lastMsg.content, m.id);
+          lastMsg = { ...lastMsg, content: decrypted };
+        } catch {
+          // Keep raw if decryption fails
+        }
+      }
 
       results.push({
         ...m,
         other_user: {
           id: profile.id,
           display_name: profile.display_name,
-          age,
+          age: Math.max(18, isNaN(age) ? 18 : age),
           gender: profile.gender,
           bio: profile.bio,
           city: profile.city,
@@ -161,7 +189,7 @@ export async function fetchUserMatches(currentUserId: string): Promise<Match[]> 
           interests: [],
           languages: [],
         },
-        last_message: msgs?.[0] || null,
+        last_message: lastMsg,
         unread_count: 0,
       });
     }
@@ -198,19 +226,25 @@ export async function fetchIncomingLikes(currentUserId: string): Promise<PublicP
       .single();
 
     if (p) {
-      const birth = new Date(p.date_of_birth);
-      const age = Math.max(18, new Date().getFullYear() - birth.getFullYear());
+      const { data: photos } = await supabase
+        .from("profile_photos")
+        .select("*")
+        .eq("user_id", p.id)
+        .order("is_primary", { ascending: false });
+
+      const age = calculateAge(p.date_of_birth);
       likers.push({
         id: p.id,
         display_name: p.display_name,
-        age,
+        age: Math.max(18, isNaN(age) ? 18 : age),
         gender: p.gender,
         bio: p.bio,
         city: p.city,
         dating_intentions: [],
         interests: [],
         languages: [],
-        photos: [],
+        photos: photos || [],
+        primary_photo_url: photos?.[0]?.url,
       });
     }
   }

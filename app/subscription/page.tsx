@@ -145,6 +145,9 @@ export default function SubscriptionPage() {
     setTimeout(() => {
       setProcessing(false);
       const title = checkoutItem?.title || "Premium Package";
+      if (typeof window !== "undefined" && checkoutItem?.type === "subscription") {
+        localStorage.setItem("cha_adda_subscription_tier", selectedPlan);
+      }
       setCheckoutItem(null);
       setUpgradedNotice(`সফল হয়েছে! "${title}" প্যাকেজ সক্রিয় হয়েছে।`);
 

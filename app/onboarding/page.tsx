@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { calculateAge, cn } from "@/lib/utils";
+import { devStore } from "@/lib/services/dev-store";
+import { createClient } from "@/lib/supabase/client";
 
 const INTEREST_OPTIONS = [
   "Music", "Travel", "Movies", "Gaming", "Fitness", "Food", 
@@ -171,7 +173,28 @@ function OnboardingContent() {
       profile_complete: true,
     };
 
-    updateCurrentProfile(profileData);
+    if (user?.id && photos.length > 0) {
+      const formattedPhotos = photos.map((url, idx) => ({
+        id: `ph-${user.id}-${idx + 1}`,
+        user_id: user.id,
+        storage_path: "",
+        url,
+        display_order: idx,
+        is_primary: idx === 0,
+        moderation_status: "approved" as const,
+        created_at: new Date().toISOString(),
+      }));
+      devStore.savePhotos(user.id, formattedPhotos);
+
+      try {
+        const supabase = createClient();
+        await supabase.from("profile_photos").upsert(formattedPhotos);
+      } catch (err) {
+        console.warn("Could not sync photos to Supabase during onboarding:", err);
+      }
+    }
+
+    await updateCurrentProfile(profileData);
     setSaving(false);
     router.push("/discover");
   };

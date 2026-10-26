@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { 
   ShieldCheck, 
@@ -9,9 +9,8 @@ import {
   X, 
   Clock, 
   AlertCircle, 
-  Calendar, 
   User, 
-  Sparkles,
+  Sparkles, 
   Camera,
   RotateCcw
 } from "lucide-react";
@@ -41,8 +40,7 @@ export default function AdminVerificationPage() {
   const [rejectionReason, setRejectionReason] = useState("মুখমণ্ডল স্পষ্ট নয় বা পর্যাপ্ত আলো নেই");
   const [isProcessingRejection, setIsProcessingRejection] = useState(false);
 
-  const loadRequests = async () => {
-    setLoading(true);
+  const loadRequests = useCallback(async () => {
     try {
       const data = await fetchAdminVerificationRequests();
       setRequests(data);
@@ -51,10 +49,25 @@ export default function AdminVerificationPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadRequests();
+    let isMounted = true;
+    fetchAdminVerificationRequests().then((data) => {
+      if (isMounted) {
+        setRequests(data);
+        setLoading(false);
+      }
+    }).catch((err) => {
+      if (isMounted) {
+        console.error("Error loading verification requests:", err);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleApprove = async (e: React.FormEvent) => {

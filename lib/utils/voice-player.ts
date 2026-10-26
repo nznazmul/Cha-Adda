@@ -67,36 +67,63 @@ export function playVoiceNote({
       const audio = new Audio(cachedUrl);
       activeAudioElement = audio;
 
-      audio.ontimeupdate = () => {
-        const current = audio.currentTime;
-        const total = audio.duration || duration;
-        onProgress(Math.min(1, current / total), current);
+      let safetyTimer: ReturnType<typeof setTimeout> | null = null;
+      let hasEnded = false;
+
+      const getSafeTotal = () => {
+        const isFiniteDuration = Number.isFinite(audio.duration) && audio.duration > 0;
+        return isFiniteDuration ? audio.duration : Math.max(1, duration);
       };
 
       const handleEnd = () => {
+        if (hasEnded) return;
+        hasEnded = true;
+        if (safetyTimer) clearTimeout(safetyTimer);
+        try {
+          audio.pause();
+          audio.currentTime = 0;
+        } catch {
+          // Safe
+        }
         activeAudioElement = null;
         onProgress(1, duration);
         onEnded();
       };
 
+      audio.ontimeupdate = () => {
+        if (hasEnded) return;
+        const total = getSafeTotal();
+        const current = audio.currentTime;
+        onProgress(Math.min(1, current / total), current);
+
+        // Enforce hard stop when current reaches or exceeds duration
+        if (current >= total) {
+          handleEnd();
+        }
+      };
+
       audio.onended = handleEnd;
       audio.onerror = () => {
-        // Fallback to Web Audio if audio element fails to decode
+        if (safetyTimer) clearTimeout(safetyTimer);
         activeAudioElement = null;
         playSyntheticVoiceTone(duration, onProgress, onEnded);
       };
 
+      // Set fallback safety stop in case browser stalls on WebM audio
+      const estimatedTotal = getSafeTotal();
+      safetyTimer = setTimeout(() => {
+        handleEnd();
+      }, (estimatedTotal + 0.4) * 1000);
+
       audio.play().catch(() => {
-        // Fallback to synthetic tone if play() rejected
+        if (safetyTimer) clearTimeout(safetyTimer);
         activeAudioElement = null;
         playSyntheticVoiceTone(duration, onProgress, onEnded);
       });
 
       const cancel = () => {
-        audio.pause();
-        audio.currentTime = 0;
-        activeAudioElement = null;
-        onEnded();
+        if (safetyTimer) clearTimeout(safetyTimer);
+        handleEnd();
       };
       activeStopCallback = cancel;
       return cancel;

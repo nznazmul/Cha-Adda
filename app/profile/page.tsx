@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import confetti from "canvas-confetti";
 import { 
   Check, 
   CheckCheck, 
@@ -19,9 +18,11 @@ import { useAuth } from "@/components/providers/auth-context";
 import { getMemberId } from "@/lib/utils/member-id";
 import { isProfileVerified, getVerificationDetails } from "@/lib/utils/verification";
 import { BlueTickBadge } from "@/components/ui/blue-tick-badge";
-import { VerificationRequest } from "@/types/database";
+import { VerificationRequest, ProfilePhoto } from "@/types/database";
 import { submitSelfieVerification, fetchMyVerificationStatus } from "@/lib/services/verification-service";
 import { SelfieCameraModal } from "@/components/profile/selfie-camera-modal";
+import { calculateAge } from "@/lib/utils";
+import { devStore } from "@/lib/services/dev-store";
 
 export default function ProfilePage() {
   const { user, updateCurrentProfile } = useAuth();
@@ -43,11 +44,15 @@ export default function ProfilePage() {
   const [verificationRequest, setVerificationRequest] = useState<VerificationRequest | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     if (user?.id) {
       fetchMyVerificationStatus(user.id).then((req) => {
-        if (req) setVerificationRequest(req);
+        if (isMounted && req) setVerificationRequest(req);
       });
     }
+    return () => {
+      isMounted = false;
+    };
   }, [user?.id]);
 
   const handleSelfieSubmit = async (selfieDataUrl: string): Promise<boolean> => {
@@ -68,19 +73,18 @@ export default function ProfilePage() {
     );
   }
 
-  const birthDate = new Date(user.date_of_birth || "2000-01-01");
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  if (
-    today.getMonth() < birthDate.getMonth() ||
-    (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())
-  ) {
-    age--;
-  }
+  const calculatedAge = calculateAge(user.date_of_birth || "2000-01-01");
+  const age = Math.max(18, isNaN(calculatedAge) ? 18 : calculatedAge);
 
   const memberId = getMemberId(user);
   const hasBlueTick = isProfileVerified(user);
   const verificationDetails = getVerificationDetails(user);
+
+  const userPhotos: ProfilePhoto[] = user?.id ? devStore.getPhotos(user.id) : [];
+  const primaryPhoto = userPhotos.find((p) => p.is_primary) || userPhotos[0];
+  const avatarUrl = primaryPhoto?.url || (user.gender === "woman" 
+    ? "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80"
+    : "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80");
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(memberId);
@@ -101,8 +105,6 @@ export default function ProfilePage() {
     setTimeout(() => setSavedNotice(false), 3000);
   };
 
-  // Clean removal of fake verification timer
-
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Top Banner & Avatar Header */}
@@ -115,7 +117,7 @@ export default function ProfilePage() {
             {/* Avatar */}
             <div className="relative h-24 w-24 rounded-3xl overflow-hidden border-4 border-card shadow-xl ring-2 ring-primary bg-secondary shrink-0">
               <img
-                src={user.id === "usr-aria-01" ? "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80" : "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80"}
+                src={avatarUrl}
                 alt={user.display_name}
                 className="w-full h-full object-cover"
               />

@@ -11,8 +11,15 @@ export default function LikesPage() {
   const { user } = useAuth();
   const [incomingLikes, setIncomingLikes] = useState<PublicProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  // Default tier configuration: Free tier shows count and blurred teasers; Gold tier unlocks
-  const [isGoldMember, setIsGoldMember] = useState(false);
+  const [isGoldMember] = useState(() => {
+    if (typeof window !== "undefined") {
+      const tier = localStorage.getItem("cha_adda_subscription_tier");
+      return tier === "gold" || tier === "platinum";
+    }
+    return false;
+  });
+
+  const hasGoldAccess = isGoldMember || user?.role === "admin";
 
   useEffect(() => {
     async function loadLikes() {
@@ -47,7 +54,7 @@ export default function LikesPage() {
         </div>
 
         {/* Upgrade Pill */}
-        {!isGoldMember && (
+        {!hasGoldAccess && (
           <Link
             href="/subscription"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-600 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:scale-105 transition-all"
@@ -90,14 +97,14 @@ export default function LikesPage() {
                 src={liker.primary_photo_url || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80"}
                 alt=""
                 className={`w-full h-full object-cover transition-transform group-hover:scale-105 ${
-                  !isGoldMember ? "blur-md scale-110" : ""
+                  !hasGoldAccess ? "blur-md scale-110" : ""
                 }`}
               />
 
               {/* Overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
-              {!isGoldMember ? (
+              {!hasGoldAccess ? (
                 /* Locked Tier Overlay */
                 <div className="absolute inset-0 flex flex-col items-center justify-center p-3 text-center text-white bg-black/30 backdrop-blur-[2px]">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 border border-white/20 mb-2">

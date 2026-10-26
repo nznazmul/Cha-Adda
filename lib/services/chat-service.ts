@@ -4,6 +4,8 @@ import { devStore } from "@/lib/services/dev-store";
 import { Message, Match, PublicProfile } from "@/types/database";
 import { encryptMessage, decryptMessage } from "@/lib/security/e2ee";
 
+import { calculateAge } from "@/lib/utils";
+
 export async function fetchMatchDetails(
   matchId: string,
   currentUserId: string
@@ -42,8 +44,8 @@ export async function fetchMatchDetails(
     return devStore.getMatch(matchId, currentUserId) || null;
   }
 
-  const birth = new Date(profile.date_of_birth);
-  const age = Math.max(18, new Date().getFullYear() - birth.getFullYear());
+  const calculatedAge = calculateAge(profile.date_of_birth);
+  const age = Math.max(18, isNaN(calculatedAge) ? 18 : calculatedAge);
 
   const otherUser: PublicProfile = {
     id: profile.id,
