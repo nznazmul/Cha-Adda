@@ -9,9 +9,14 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "seed:bots": "node scripts/seed-bots.mjs"
+    "seed:bots": "node scripts/seed-bots.mjs",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "@types/canvas-confetti": "^1.9.0",

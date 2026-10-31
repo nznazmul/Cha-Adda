@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cha Adda</string>
+    <string name="title_activity_main">Cha Adda</string>
+    <string name="package_name">com.chaadda.app</string>
+    <string name="custom_url_scheme">com.chaadda.app</string>
+</resources>
