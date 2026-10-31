@@ -503,7 +503,19 @@ class DevDataStore {
     };
   }
 
-  getDiscoveryCandidates(currentUserId: string, maxDistanceKm?: number): PublicProfile[] {
+  getDiscoveryCandidates(
+    currentUserId: string,
+    filterOptions?:
+      | number
+      | {
+          maxDistanceKm?: number;
+          minAge?: number;
+          maxAge?: number;
+          genders?: string[];
+          interest?: string;
+          intention?: string;
+        }
+  ): PublicProfile[] {
     // Exclude swiped profiles, blocked profiles, self, and undiscoverable profiles
     const swipedTargetIds = new Set(
       this.swipes
@@ -520,7 +532,19 @@ class DevDataStore {
     );
 
     const userPrefs = this.getPreferences(currentUserId);
-    const effectiveLimit = typeof maxDistanceKm === "number" ? maxDistanceKm : (userPrefs?.max_distance_km ?? 50);
+    const isNum = typeof filterOptions === "number";
+    const opts = isNum ? { maxDistanceKm: filterOptions } : filterOptions;
+
+    const effectiveLimit =
+      typeof opts?.maxDistanceKm === "number"
+        ? opts.maxDistanceKm
+        : (userPrefs?.max_distance_km ?? 50);
+
+    const minAge = opts?.minAge ?? userPrefs?.min_age ?? 18;
+    const maxAge = opts?.maxAge ?? userPrefs?.max_age ?? 100;
+    const genders = opts?.genders ?? userPrefs?.preferred_genders;
+    const interestFilter = opts?.interest?.trim().toLowerCase();
+    const intentionFilter = opts?.intention?.trim().toLowerCase();
 
     const candidates: PublicProfile[] = [];
     for (const [id, p] of this.profiles.entries()) {
@@ -533,12 +557,41 @@ class DevDataStore {
         p.account_status === "active"
       ) {
         const pub = this.toPublicProfile(p, currentUserId);
-        // Distance filter: If effectiveLimit < 300 (not "All Bangladesh"), filter by distance!
+
+        // Distance filter: If effectiveLimit < 300 (not "All Bangladesh"), filter by distance
         if (effectiveLimit < 300) {
           if (typeof pub.approx_distance_km === "number" && pub.approx_distance_km > effectiveLimit) {
             continue;
           }
         }
+
+        // Age filter
+        if (pub.age < minAge || pub.age > maxAge) {
+          continue;
+        }
+
+        // Gender filter
+        if (Array.isArray(genders) && genders.length > 0 && !genders.includes(pub.gender)) {
+          continue;
+        }
+
+        // Shared interest filter
+        if (
+          interestFilter &&
+          (!pub.interests || !pub.interests.some((i) => i.toLowerCase().includes(interestFilter)))
+        ) {
+          continue;
+        }
+
+        // Dating intention filter
+        if (
+          intentionFilter &&
+          (!pub.dating_intentions ||
+            !pub.dating_intentions.some((d) => d.toLowerCase().includes(intentionFilter)))
+        ) {
+          continue;
+        }
+
         candidates.push(pub);
       }
     }
@@ -747,7 +800,7 @@ class DevDataStore {
     matchId: string,
     senderId: string,
     content: string,
-    messageType: "text" | "voice" | "tea_invite" = "text",
+    messageType: "text" | "voice" | "tea_invite" | "gif" = "text",
     voiceDuration?: number
   ): Message {
     const msg: Message = {

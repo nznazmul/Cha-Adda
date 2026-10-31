@@ -19,7 +19,10 @@ import {
   Play,
   Pause,
   MapPin,
-  X
+  X,
+  Smile,
+  Film,
+  Bell
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { 
@@ -49,6 +52,23 @@ const SAFE_CAFES = [
   { name: "Butlers Chocolate Cafe", area: "Gulshan-1", tip: "চমৎকার ডেজার্ট ও হট চকলেট" }
 ];
 
+const DATING_GIFS = [
+  { id: "g1", title: "এক কাপ কফি/চা", url: "https://media.giphy.com/media/h8r3xOGzwAY3xUNGVW/giphy.gif" },
+  { id: "g2", title: "মিষ্টি হাসি", url: "https://media.giphy.com/media/26AHONQ79FdWZhAI0/giphy.gif" },
+  { id: "g3", title: "ভালোবাসা / Heart", url: "https://media.giphy.com/media/l4pTdcifPZLpDjL1e/giphy.gif" },
+  { id: "g4", title: "হাই / Waving Hello", url: "https://media.giphy.com/media/ASd0Ukj0BC5roG5Lmp/giphy.gif" },
+  { id: "g5", title: "চায়ের কাপে চিয়ার্স", url: "https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/giphy.gif" },
+  { id: "g6", title: "আনন্দ নাচ", url: "https://media.giphy.com/media/blSTtZehjAZ8I/giphy.gif" },
+  { id: "g7", title: "গোলাপ ফুল", url: "https://media.giphy.com/media/26vUxJ9rqfwuIEkTu/giphy.gif" },
+  { id: "g8", title: "উষ্ণ আলিঙ্গন", url: "https://media.giphy.com/media/Vz58J8shFW6BvqnYTm/giphy.gif" },
+];
+
+const POPULAR_EMOJIS = [
+  "☕", "🫖", "❤️", "😍", "🥰", "😊", "✨", "🔥", 
+  "🌹", "👋", "😉", "🎉", "🍰", "🥐", "🫶", "🥂",
+  "💬", "🙌", "😂", "🌸", "🍫", "🍓", "🎶", "🎈"
+];
+
 function ChatConversationContent() {
   const params = useParams();
   const router = useRouter();
@@ -65,6 +85,8 @@ function ChatConversationContent() {
   const [sending, setSending] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showCafePicker, setShowCafePicker] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
   const [availableSpots, setAvailableSpots] = useState<MeetingSpot[]>([]);
   const [confirmUnmatch, setConfirmUnmatch] = useState(false);
 
@@ -146,12 +168,37 @@ function ChatConversationContent() {
         if (prev.some((m) => m.id === newMsg.id)) return prev;
         return [...prev, newMsg];
       });
+
+      // Show browser notification if document is hidden and user granted permission
+      if (
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted" &&
+        document.hidden &&
+        user &&
+        newMsg.sender_id !== user.id
+      ) {
+        try {
+          const bodyText =
+            newMsg.message_type === "voice"
+              ? "🎙️ নতুন একটি ভয়েস নোট পাঠিয়েছেন"
+              : newMsg.message_type === "gif"
+              ? "🎬 একটি জিআইএফ (GIF) পাঠিয়েছেন"
+              : newMsg.content;
+          new Notification(partner?.display_name || "চা আড্ডা", {
+            body: bodyText,
+            icon: partner?.primary_photo_url || "/favicon.ico",
+          });
+        } catch {
+          // Ignore
+        }
+      }
     });
 
     return () => {
       unsubscribe();
     };
-  }, [matchId, user]);
+  }, [matchId, user, partner]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -322,6 +369,30 @@ function ChatConversationContent() {
     setShowCafePicker(false);
   };
 
+  const handleInsertEmoji = (emoji: string) => {
+    setInputText((prev) => prev + emoji);
+  };
+
+  const handleSendGif = async (gifUrl: string) => {
+    if (!user || sending) return;
+    setShowGifPicker(false);
+    setSending(true);
+    try {
+      const sentMsg = await postChatMessage(matchId, user.id, gifUrl, "gif");
+      setMessages((prev) => [...prev, sentMsg]);
+    } catch (err) {
+      console.error("Failed to send GIF:", err);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const requestNotificationPermission = async () => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      await Notification.requestPermission();
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -391,6 +462,19 @@ function ChatConversationContent() {
             <Coffee className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">ক্যাফে আড্ডা 📍</span>
           </button>
+
+          {/* Notification Alert Prompt Button */}
+          {typeof window !== "undefined" && "Notification" in window && Notification.permission !== "granted" && (
+            <button
+              type="button"
+              onClick={requestNotificationPermission}
+              title="বার্তা আসলে ব্রাউজার নোটিফিকেশন পান"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary/80 text-muted-foreground hover:text-foreground text-xs font-medium transition-colors"
+            >
+              <Bell className="h-3.5 w-3.5 text-rose-500 animate-bounce" />
+              <span className="hidden sm:inline text-[11px]">নোটিফিকেশন</span>
+            </button>
+          )}
 
           <button
             onClick={() => setMenuOpen(!menuOpen)}
@@ -519,6 +603,7 @@ function ChatConversationContent() {
             const isMe = msg.sender_id === user?.id;
             const isVoice = msg.message_type === "voice" || msg.content.includes("Voice Note");
             const isTeaInvite = msg.message_type === "tea_invite" || msg.content.includes("চা খাওয়ার দাওয়াত");
+            const isGif = msg.message_type === "gif" || (msg.content.startsWith("http") && (msg.content.includes("giphy.com") || msg.content.endsWith(".gif")));
 
             return (
               <div
@@ -615,6 +700,23 @@ function ChatConversationContent() {
                       </div>
                     )}
                   </div>
+                ) : isGif ? (
+                  /* Animated GIF Bubble */
+                  <div
+                    className={cn(
+                      "rounded-2xl overflow-hidden p-1.5 shadow-md border max-w-[240px] sm:max-w-[280px]",
+                      isMe
+                        ? "bg-rose-500/10 border-rose-500/30 rounded-br-xs"
+                        : "bg-secondary border-border rounded-bl-xs"
+                    )}
+                  >
+                    <img
+                      src={msg.content}
+                      alt="GIF Animation"
+                      className="rounded-xl w-full max-h-56 object-cover"
+                      loading="lazy"
+                    />
+                  </div>
                 ) : (
                   /* Standard Text Bubble */
                   <div
@@ -639,6 +741,68 @@ function ChatConversationContent() {
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Emoji Picker Tray */}
+      {showEmojiPicker && (
+        <div className="border-t border-border/70 bg-card/95 p-3 animate-in fade-in slide-in-from-bottom-2 shrink-0">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-border text-xs font-semibold text-muted-foreground">
+            <span className="flex items-center gap-1.5 text-amber-500">
+              <Smile className="h-4 w-4" />
+              <span>ইমোজি বেছে নিন (Emojis)</span>
+            </span>
+            <button onClick={() => setShowEmojiPicker(false)} className="p-1 rounded-full text-muted-foreground hover:text-foreground">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-8 sm:grid-cols-12 gap-1.5 max-h-36 overflow-y-auto p-1">
+            {POPULAR_EMOJIS.map((emoji, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleInsertEmoji(emoji)}
+                className="text-xl p-2 rounded-xl hover:bg-secondary active:scale-125 transition-transform flex items-center justify-center"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* GIF Picker Tray */}
+      {showGifPicker && (
+        <div className="border-t border-border/70 bg-card/95 p-3 animate-in fade-in slide-in-from-bottom-2 shrink-0">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-border text-xs font-semibold text-muted-foreground">
+            <span className="flex items-center gap-1.5 text-rose-500">
+              <Film className="h-4 w-4" />
+              <span>জিআইএফ অ্যানিমেশন বেছে নিন (GIFs)</span>
+            </span>
+            <button onClick={() => setShowGifPicker(false)} className="p-1 rounded-full text-muted-foreground hover:text-foreground">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto p-1">
+            {DATING_GIFS.map((gif) => (
+              <button
+                key={gif.id}
+                type="button"
+                onClick={() => handleSendGif(gif.url)}
+                className="group relative rounded-xl overflow-hidden border border-border hover:border-primary transition-all aspect-video"
+              >
+                <img
+                  src={gif.url}
+                  alt={gif.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                  loading="lazy"
+                />
+                <div className="absolute inset-x-0 bottom-0 bg-black/60 px-1.5 py-0.5 text-[10px] text-white truncate text-center font-medium">
+                  {gif.title}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Message Composer */}
       <div className="p-3 sm:p-4 border-t border-border/80 bg-card shrink-0">
@@ -672,7 +836,7 @@ function ChatConversationContent() {
           </div>
         ) : (
           /* Standard Input Bar */
-          <form onSubmit={handleSend} className="flex items-end gap-2">
+          <form onSubmit={handleSend} className="flex items-end gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={startVoiceRecording}
@@ -680,6 +844,40 @@ function ChatConversationContent() {
               className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-secondary text-muted-foreground hover:text-primary hover:border-primary transition-all shrink-0"
             >
               <Mic className="h-5 w-5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowEmojiPicker((prev) => !prev);
+                setShowGifPicker(false);
+              }}
+              title="ইমোজি (Emojis)"
+              className={cn(
+                "flex h-11 w-11 items-center justify-center rounded-2xl border transition-all shrink-0",
+                showEmojiPicker
+                  ? "border-amber-500 bg-amber-500/15 text-amber-500"
+                  : "border-border bg-secondary text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Smile className="h-5 w-5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowGifPicker((prev) => !prev);
+                setShowEmojiPicker(false);
+              }}
+              title="জিআইএফ অ্যানিমেশন (GIFs)"
+              className={cn(
+                "flex h-11 w-11 items-center justify-center rounded-2xl border transition-all shrink-0",
+                showGifPicker
+                  ? "border-rose-500 bg-rose-500/15 text-rose-500"
+                  : "border-border bg-secondary text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Film className="h-5 w-5" />
             </button>
 
             <textarea

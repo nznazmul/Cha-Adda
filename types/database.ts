@@ -124,7 +124,7 @@ export interface Message {
   match_id: string;
   sender_id: string;
   content: string;
-  message_type?: "text" | "voice" | "tea_invite";
+  message_type?: "text" | "voice" | "tea_invite" | "gif";
   voice_duration?: number;
   tea_venue?: string;
   tea_note?: string;

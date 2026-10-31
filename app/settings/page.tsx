@@ -19,7 +19,8 @@ import {
   LocateFixed,
   Users,
   Compass,
-  Check
+  Check,
+  Heart
 } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useAuth } from "@/components/providers/auth-context";
@@ -57,6 +58,11 @@ export default function SettingsPage() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [nearbyCount, setNearbyCount] = useState<number>(0);
 
+  // Ideal Match Preferences State (Age & Gender)
+  const [minAge, setMinAge] = useState<number>(18);
+  const [maxAge, setMaxAge] = useState<number>(45);
+  const [preferredGenders, setPreferredGenders] = useState<string[]>(["woman"]);
+
   // Load preferences from database / local store
   useEffect(() => {
     let isMounted = true;
@@ -65,6 +71,9 @@ export default function SettingsPage() {
         if (!isMounted) return;
         setMaxDistance(prefs.max_distance_km || 50);
         setShowDistance(prefs.show_distance !== false);
+        setMinAge(prefs.min_age || 18);
+        setMaxAge(prefs.max_age || 45);
+        setPreferredGenders(prefs.preferred_genders || ["woman"]);
       });
     }
     if (user?.city) {
@@ -105,6 +114,46 @@ export default function SettingsPage() {
     }
   };
 
+  const handleAgeChange = async (newMin: number, newMax: number) => {
+    const validMin = Math.min(newMin, newMax);
+    const validMax = Math.max(newMin, newMax);
+    setMinAge(validMin);
+    setMaxAge(validMax);
+    if (user?.id) {
+      await saveUserPreferences(user.id, {
+        min_age: validMin,
+        max_age: validMax,
+      });
+      showNotification(`পছন্দের বয়সের পরিধি ${validMin} - ${validMax} বছর নির্ধারণ করা হয়েছে!`);
+    }
+  };
+
+  const handleGenderToggle = async (targetGender: string) => {
+    let nextGenders: string[];
+    if (targetGender === "all") {
+      nextGenders = ["woman", "man", "nonbinary"];
+    } else {
+      if (preferredGenders.length === 3) {
+        nextGenders = [targetGender];
+      } else if (preferredGenders.includes(targetGender)) {
+        if (preferredGenders.length > 1) {
+          nextGenders = preferredGenders.filter((g) => g !== targetGender);
+        } else {
+          nextGenders = ["woman", "man", "nonbinary"];
+        }
+      } else {
+        nextGenders = [...preferredGenders, targetGender];
+      }
+    }
+    setPreferredGenders(nextGenders);
+    if (user?.id) {
+      await saveUserPreferences(user.id, {
+        preferred_genders: nextGenders,
+      });
+      showNotification("লিঙ্গ পছন্দ সফলভাবে সংরক্ষিত হয়েছে!");
+    }
+  };
+
   const handleSavePreferences = async (overrides?: { isDiscoverable?: boolean; showDistance?: boolean }) => {
     if (!user?.id) return;
     const discoverable = overrides?.isDiscoverable ?? isDiscoverable;
@@ -118,6 +167,9 @@ export default function SettingsPage() {
     await saveUserPreferences(user.id, {
       max_distance_km: maxDistance,
       show_distance: distVisible,
+      min_age: minAge,
+      max_age: maxAge,
+      preferred_genders: preferredGenders,
     });
 
     showNotification("সেটিংস সফলভাবে আপডেট করা হয়েছে!");
@@ -357,6 +409,125 @@ export default function SettingsPage() {
               <option value="Jessore">যশোর (Jessore)</option>
               <option value="Bandarban">বান্দরবান (Bandarban)</option>
             </select>
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURE: Ideal Match Preferences (Age & Gender) */}
+      <section className="rounded-3xl border border-rose-500/30 bg-card p-5 sm:p-6 shadow-xl space-y-5 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="flex items-center justify-between border-b border-border/80 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-rose-500/20 to-amber-500/20 text-rose-500">
+              <Heart className="h-5 w-5 fill-rose-500/30" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-black text-foreground flex items-center gap-1.5">
+                <span>ম্যাচিং পছন্দসমূহ (Match Preferences)</span>
+              </h2>
+              <p className="text-[11px] text-muted-foreground">
+                আপনি কাদের সাথে পরিচিত হতে চান — বয়স ও লিঙ্গ ফিল্টার করুন।
+              </p>
+            </div>
+          </div>
+          <span className="rounded-full bg-rose-500/15 border border-rose-500/30 px-3 py-1 text-xs font-black text-rose-500 font-mono">
+            {minAge} - {maxAge} বছর
+          </span>
+        </div>
+
+        {/* Interested In / Gender Matching */}
+        <div className="space-y-2">
+          <span className="text-xs font-bold text-foreground block">
+            কার সাথে পরিচিত হতে চান? (Interested In):
+          </span>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { id: "woman", label: "নারী (Women)", hint: "শুধুমাত্র নারীদের প্রোফাইল" },
+              { id: "man", label: "পুরুষ (Men)", hint: "শুধুমাত্র পুরুষদের প্রোফাইল" },
+              { id: "all", label: "সবাই (Everyone)", hint: "সকল মেম্বার" },
+            ].map((g) => {
+              const isAll = g.id === "all" && preferredGenders.length >= 2;
+              const isSelected = isAll || (preferredGenders.length === 1 && preferredGenders.includes(g.id));
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => handleGenderToggle(g.id)}
+                  className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all ${
+                    isSelected
+                      ? "border-rose-500 bg-rose-500/10 text-rose-500 shadow-sm"
+                      : "border-border/80 bg-background hover:bg-secondary/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <span className="text-xs font-bold flex items-center gap-1">
+                    {g.label}
+                    {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
+                  </span>
+                  <span className="text-[10px] opacity-75 mt-0.5 truncate w-full">
+                    {g.hint}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Age Range Slider Controls */}
+        <div className="space-y-4 pt-2 border-t border-border/80">
+          <div className="flex items-center justify-between text-xs font-semibold">
+            <span className="text-muted-foreground">পছন্দের বয়স সীমা (Age Range):</span>
+            <span className="font-bold text-foreground">
+              {minAge} বছর থেকে {maxAge} বছর
+            </span>
+          </div>
+
+          {/* Min Age Slider */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[11px] text-muted-foreground font-medium">
+              <span>নূন্যতম বয়স (Min Age):</span>
+              <span className="font-mono font-bold text-foreground">{minAge} বছর</span>
+            </div>
+            <input
+              type="range"
+              min={18}
+              max={65}
+              step={1}
+              value={minAge}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleAgeChange(val, Math.max(val, maxAge));
+              }}
+              className="w-full h-2.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-rose-500"
+            />
+          </div>
+
+          {/* Max Age Slider */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[11px] text-muted-foreground font-medium">
+              <span>সর্বোচ্চ বয়স (Max Age):</span>
+              <span className="font-mono font-bold text-foreground">{maxAge} বছর</span>
+            </div>
+            <input
+              type="range"
+              min={18}
+              max={70}
+              step={1}
+              value={maxAge}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleAgeChange(Math.min(minAge, val), val);
+              }}
+              className="w-full h-2.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-amber-500"
+            />
+          </div>
+
+          <div className="flex justify-between text-[10px] text-muted-foreground font-mono px-0.5">
+            <span>১৮ বছর</span>
+            <span>২৫ বছর</span>
+            <span>৩৫ বছর</span>
+            <span>৫০ বছর</span>
+            <span>৭০ বছর</span>
           </div>
         </div>
       </section>

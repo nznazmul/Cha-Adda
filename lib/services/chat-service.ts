@@ -132,7 +132,7 @@ export async function postChatMessage(
   matchId: string,
   senderId: string,
   content: string,
-  messageType: "text" | "voice" | "tea_invite" = "text",
+  messageType: "text" | "voice" | "tea_invite" | "gif" = "text",
   voiceDuration?: number
 ): Promise<Message> {
   const trimmed = content.trim();

@@ -63,9 +63,14 @@ export default function DiscoverPage() {
   const [customTeaNote, setCustomTeaNote] = useState("এক কাপ ধোঁয়া ওঠা চা আর চমৎকার আড্ডার দাওয়াত রইল!");
   const [inviteSending, setInviteSending] = useState(false);
 
-  // Distance Radius Filter State
+  // Advanced Discovery Filter State
   const [radiusFilter, setRadiusFilter] = useState<number>(50);
-  const [showRadiusModal, setShowRadiusModal] = useState<boolean>(false);
+  const [filterMinAge, setFilterMinAge] = useState<number>(18);
+  const [filterMaxAge, setFilterMaxAge] = useState<number>(65);
+  const [filterGenders, setFilterGenders] = useState<string[]>(["woman", "man", "nonbinary"]);
+  const [filterInterest, setFilterInterest] = useState<string>("");
+  const [filterIntention, setFilterIntention] = useState<string>("");
+  const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
 
   // Search State for Member ID / Name Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,13 +84,23 @@ export default function DiscoverPage() {
   const likeOpacity = useTransform(x, [10, 100], [0, 1]);
   const nopeOpacity = useTransform(x, [-10, -100], [0, 1]);
 
-  // Load user's saved distance preferences and listen for updates
+  // Load user's saved distance and match preferences and listen for updates
   useEffect(() => {
     let isMounted = true;
     if (user?.id) {
       fetchUserPreferences(user.id).then((prefs) => {
-        if (isMounted && typeof prefs.max_distance_km === "number") {
+        if (!isMounted) return;
+        if (typeof prefs.max_distance_km === "number") {
           setRadiusFilter(prefs.max_distance_km);
+        }
+        if (typeof prefs.min_age === "number") {
+          setFilterMinAge(prefs.min_age);
+        }
+        if (typeof prefs.max_age === "number") {
+          setFilterMaxAge(prefs.max_age);
+        }
+        if (Array.isArray(prefs.preferred_genders) && prefs.preferred_genders.length > 0) {
+          setFilterGenders(prefs.preferred_genders);
         }
       });
     }
@@ -94,6 +109,15 @@ export default function DiscoverPage() {
       const custom = e as CustomEvent;
       if (custom.detail?.max_distance_km) {
         setRadiusFilter(custom.detail.max_distance_km);
+      }
+      if (custom.detail?.min_age) {
+        setFilterMinAge(custom.detail.min_age);
+      }
+      if (custom.detail?.max_age) {
+        setFilterMaxAge(custom.detail.max_age);
+      }
+      if (custom.detail?.preferred_genders) {
+        setFilterGenders(custom.detail.preferred_genders);
       }
     };
     window.addEventListener("cha_adda_preferences_changed", handlePrefsChange);
@@ -111,6 +135,11 @@ export default function DiscoverPage() {
       try {
         const list = await fetchDiscoveryCandidates(user.id, {
           maxDistanceKm: radiusFilter,
+          minAge: filterMinAge,
+          maxAge: filterMaxAge,
+          genders: filterGenders,
+          interest: filterInterest || undefined,
+          intention: filterIntention || undefined,
         });
         setCandidates(list);
         setCurrentIndex(0);
@@ -123,11 +152,41 @@ export default function DiscoverPage() {
     }
 
     loadCandidates();
-  }, [user, radiusFilter]);
+  }, [user, radiusFilter, filterMinAge, filterMaxAge, filterGenders, filterInterest, filterIntention]);
+
+  const handleApplyFilters = async () => {
+    setShowFilterModal(false);
+    if (user?.id) {
+      await saveUserPreferences(user.id, {
+        max_distance_km: radiusFilter,
+        min_age: filterMinAge,
+        max_age: filterMaxAge,
+        preferred_genders: filterGenders,
+      });
+    }
+  };
+
+  const handleResetFilters = async () => {
+    setRadiusFilter(50);
+    setFilterMinAge(18);
+    setFilterMaxAge(65);
+    setFilterGenders(["woman", "man", "nonbinary"]);
+    setFilterInterest("");
+    setFilterIntention("");
+    setShowFilterModal(false);
+    if (user?.id) {
+      await saveUserPreferences(user.id, {
+        max_distance_km: 50,
+        min_age: 18,
+        max_age: 65,
+        preferred_genders: ["woman", "man", "nonbinary"],
+      });
+    }
+  };
 
   const handleUpdateRadius = async (newKm: number) => {
     setRadiusFilter(newKm);
-    setShowRadiusModal(false);
+    setShowFilterModal(false);
     if (user?.id) {
       await saveUserPreferences(user.id, { max_distance_km: newKm });
     }
@@ -342,15 +401,18 @@ export default function DiscoverPage() {
           )}
         </div>
 
-        {/* Quick Distance Filter Trigger */}
+        {/* Advanced Discovery Filters Trigger */}
         <button
           type="button"
-          onClick={() => setShowRadiusModal(true)}
-          title="দূরত্ব ফিল্টার পরিবর্তন করুন"
-          className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl border border-rose-500/40 bg-card/90 hover:bg-rose-500/10 text-rose-500 text-xs font-bold shadow-lg backdrop-blur-md transition-all active:scale-95 shrink-0"
+          onClick={() => setShowFilterModal(true)}
+          title="উন্নত আবিষ্কার ফিল্টার (Filters)"
+          className="relative flex items-center gap-1.5 px-3 py-2.5 rounded-2xl border border-rose-500/40 bg-card/90 hover:bg-rose-500/10 text-rose-500 text-xs font-bold shadow-lg backdrop-blur-md transition-all active:scale-95 shrink-0"
         >
-          <Compass className="h-4 w-4" />
+          <SlidersHorizontal className="h-4 w-4" />
           <span>{radiusFilter >= 300 ? "সারাদেশ" : `${radiusFilter}km`}</span>
+          {(filterInterest || filterIntention || filterMinAge > 18 || filterMaxAge < 65) && (
+            <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-background animate-pulse" />
+          )}
         </button>
       </div>
 
@@ -1033,92 +1095,284 @@ export default function DiscoverPage() {
         </div>
       )}
 
-      {/* Quick Distance Radius Filter Modal */}
-      {showRadiusModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-sm rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-border/80 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-500/15 text-rose-500">
-                  <Compass className="h-4 w-4" />
+      {/* Advanced Discovery Filters Modal */}
+      {showFilterModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md max-h-[90vh] flex flex-col rounded-3xl border border-border bg-card shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-border/80 p-4 sm:p-5 shrink-0 bg-card/90">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-rose-500/20 to-amber-500/20 text-rose-500">
+                  <SlidersHorizontal className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-foreground">দূরত্ব ফিল্টার (Distance Radius)</h3>
-                  <p className="text-[10px] text-muted-foreground">আপনার চারপাশের কত দূরত্বের মানুষ দেখবেন?</p>
+                  <h3 className="text-sm sm:text-base font-black text-foreground">
+                    আবিষ্কারের ফিল্টার (Discovery Filters)
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground">
+                    দূরত্ব, বয়স, শখ ও পছন্দের ভিত্তিতে মেম্বার ফিল্টার করুন।
+                  </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setShowRadiusModal(false)}
-                className="p-1 rounded-full text-muted-foreground hover:bg-secondary transition-colors"
+                onClick={() => setShowFilterModal(false)}
+                className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">নির্বাচিত সর্বোচ্চ দূরত্ব:</span>
-                <span className="font-bold text-rose-500 font-mono">
-                  {radiusFilter >= 300 ? "পুরো বাংলাদেশ (All)" : `${radiusFilter} কিমি`}
+            {/* Modal Body - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5">
+              {/* 1. Distance Radius */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-foreground flex items-center gap-1.5">
+                    <Compass className="h-3.5 w-3.5 text-rose-500" />
+                    <span>সর্বোচ্চ দূরত্ব (Distance Radius)</span>
+                  </span>
+                  <span className="font-mono text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">
+                    {radiusFilter >= 300 ? "সারাদেশ (300+ km)" : `${radiusFilter} কিমি`}
+                  </span>
+                </div>
+
+                <input
+                  type="range"
+                  min={5}
+                  max={300}
+                  step={5}
+                  value={radiusFilter}
+                  onChange={(e) => setRadiusFilter(Number(e.target.value))}
+                  className="w-full h-2.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-rose-500"
+                />
+
+                <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+                  <span>৫ কিমি</span>
+                  <span>৫০ কিমি</span>
+                  <span>১০০ কিমি</span>
+                  <span>সারাদেশ</span>
+                </div>
+
+                {/* Quick Distance Presets */}
+                <div className="grid grid-cols-4 gap-1.5 pt-1">
+                  {[
+                    { label: "১০ কিমি", val: 10 },
+                    { label: "২৫ কিমি", val: 25 },
+                    { label: "৫০ কিমি", val: 50 },
+                    { label: "সারাদেশ", val: 300 },
+                  ].map((p) => (
+                    <button
+                      key={p.val}
+                      type="button"
+                      onClick={() => setRadiusFilter(p.val)}
+                      className={`py-1.5 px-2 rounded-xl text-xs font-semibold border transition-all text-center ${
+                        radiusFilter === p.val
+                          ? "border-rose-500 bg-rose-500/10 text-rose-500 font-bold"
+                          : "border-border bg-secondary/40 text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Age Range */}
+              <div className="space-y-3 pt-3 border-t border-border/80">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-foreground flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-amber-500" />
+                    <span>বয়সের পরিধি (Age Range)</span>
+                  </span>
+                  <span className="font-mono text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                    {filterMinAge} - {filterMaxAge} বছর
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[11px] text-muted-foreground">
+                    <span>কমপক্ষে (Min): {filterMinAge} বছর</span>
+                    <span>সর্বোচ্চ (Max): {filterMaxAge} বছর</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="range"
+                      min={18}
+                      max={65}
+                      step={1}
+                      value={filterMinAge}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setFilterMinAge(val);
+                        if (val > filterMaxAge) setFilterMaxAge(val);
+                      }}
+                      className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-rose-500"
+                    />
+                    <input
+                      type="range"
+                      min={18}
+                      max={70}
+                      step={1}
+                      value={filterMaxAge}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setFilterMaxAge(val);
+                        if (val < filterMinAge) setFilterMinAge(val);
+                      }}
+                      className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-amber-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Gender / Interested In */}
+              <div className="space-y-2 pt-3 border-t border-border/80">
+                <span className="text-xs font-bold text-foreground block">
+                  কার সাথে পরিচিত হতে চান? (Interested In)
                 </span>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "woman", label: "নারী (Women)" },
+                    { id: "man", label: "পুরুষ (Men)" },
+                    { id: "all", label: "সবাই (Everyone)" },
+                  ].map((g) => {
+                    const isAll = g.id === "all" && filterGenders.length >= 2;
+                    const isSelected = isAll || (filterGenders.length === 1 && filterGenders.includes(g.id));
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => {
+                          if (g.id === "all") {
+                            setFilterGenders(["woman", "man", "nonbinary"]);
+                          } else {
+                            setFilterGenders([g.id]);
+                          }
+                        }}
+                        className={`py-2 px-2 rounded-xl text-xs font-semibold border transition-all text-center ${
+                          isSelected
+                            ? "border-rose-500 bg-rose-500/10 text-rose-500 font-bold"
+                            : "border-border bg-secondary/40 text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {g.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <input
-                type="range"
-                min={5}
-                max={300}
-                step={5}
-                value={radiusFilter}
-                onChange={(e) => setRadiusFilter(Number(e.target.value))}
-                className="w-full h-2.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-rose-500"
-              />
+              {/* 4. Shared Interests / Passions */}
+              <div className="space-y-2 pt-3 border-t border-border/80">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-foreground flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <span>সাধারণ আগ্রহ বা শখ (Shared Interests)</span>
+                  </span>
+                  {filterInterest && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterInterest("")}
+                      className="text-[10px] text-muted-foreground hover:text-foreground underline"
+                    >
+                      মুছে ফেলুন
+                    </button>
+                  )}
+                </div>
 
-              <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                <span>৫ কিমি</span>
-                <span>৫০ কিমি</span>
-                <span>১০০ কিমি</span>
-                <span>৩০০+ কিমি (সারাদেশ)</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    "চা ও আড্ডা",
+                    "Coffee",
+                    "Books",
+                    "Travel",
+                    "Music",
+                    "Art",
+                    "Food",
+                    "Cooking",
+                    "Technology",
+                    "Fitness",
+                    "Pets",
+                    "Movies",
+                  ].map((interest) => {
+                    const isSelected = filterInterest.toLowerCase() === interest.toLowerCase();
+                    return (
+                      <button
+                        key={interest}
+                        type="button"
+                        onClick={() => setFilterInterest(isSelected ? "" : interest)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary text-white shadow-sm font-semibold"
+                            : "border-border/80 bg-secondary/50 text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                        }`}
+                      >
+                        {interest}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Quick Presets */}
-              <div className="grid grid-cols-3 gap-1.5 pt-1">
-                {[
-                  { label: "১০ কিমি", val: 10 },
-                  { label: "২৫ কিমি", val: 25 },
-                  { label: "৫০ কিমি", val: 50 },
-                  { label: "১০০ কিমি", val: 100 },
-                  { label: "১৫০ কিমি", val: 150 },
-                  { label: "সারাদেশ", val: 300 },
-                ].map((p) => (
-                  <button
-                    key={p.val}
-                    type="button"
-                    onClick={() => setRadiusFilter(p.val)}
-                    className={`py-2 px-2 rounded-xl text-xs font-semibold border transition-all text-center ${
-                      radiusFilter === p.val
-                        ? "border-rose-500 bg-rose-500/10 text-rose-500 shadow-sm font-bold"
-                        : "border-border bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
+              {/* 5. Dating Intentions */}
+              <div className="space-y-2 pt-3 border-t border-border/80">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-foreground flex items-center gap-1.5">
+                    <Heart className="h-3.5 w-3.5 text-rose-500" />
+                    <span>সম্পর্কের উদ্দেশ্য (Dating Intentions)</span>
+                  </span>
+                  {filterIntention && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterIntention("")}
+                      className="text-[10px] text-muted-foreground hover:text-foreground underline"
+                    >
+                      মুছে ফেলুন
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    "Serious dating",
+                    "Long-term relationship",
+                    "Casual dating",
+                    "Friendship",
+                  ].map((intent) => {
+                    const isSelected = filterIntention.toLowerCase() === intent.toLowerCase();
+                    return (
+                      <button
+                        key={intent}
+                        type="button"
+                        onClick={() => setFilterIntention(isSelected ? "" : intent)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                          isSelected
+                            ? "border-rose-500 bg-rose-500 text-white shadow-sm font-semibold"
+                            : "border-border/80 bg-secondary/50 text-muted-foreground hover:border-rose-500/50 hover:text-foreground"
+                        }`}
+                      >
+                        {intent}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            <div className="pt-2 flex items-center justify-between gap-2 border-t border-border/80">
-              <Link
-                href="/settings"
-                onClick={() => setShowRadiusModal(false)}
-                className="text-xs text-muted-foreground hover:text-foreground underline flex items-center gap-1"
-              >
-                <span>আরও সেটিংস</span>
-              </Link>
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-border/80 bg-card/90 flex items-center justify-between gap-3 shrink-0">
               <button
                 type="button"
-                onClick={() => handleUpdateRadius(radiusFilter)}
-                className="py-2.5 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold shadow-md shadow-rose-500/25 transition-all"
+                onClick={handleResetFilters}
+                className="py-2.5 px-3.5 rounded-xl border border-border bg-secondary/60 text-muted-foreground hover:text-foreground text-xs font-semibold transition-colors"
+              >
+                রিসেট (Reset)
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyFilters}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-white text-xs font-bold shadow-lg shadow-rose-500/25 transition-all text-center"
               >
                 ফিল্টার প্রয়োগ করুন 🎯
               </button>

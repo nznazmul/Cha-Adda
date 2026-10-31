@@ -9,27 +9,56 @@ import { decryptMessage } from "@/lib/security/e2ee";
 import { calculateDistanceBetween } from "@/lib/services/geo-service";
 import { fetchUserPreferences } from "@/lib/services/preferences-service";
 
+export interface DiscoveryCandidateOptions {
+  cityFilter?: string;
+  maxDistanceKm?: number;
+  minAge?: number;
+  maxAge?: number;
+  genders?: string[];
+  interest?: string;
+  intention?: string;
+}
+
 export async function fetchDiscoveryCandidates(
   currentUserId: string,
-  options?: { cityFilter?: string; maxDistanceKm?: number } | string
+  options?: DiscoveryCandidateOptions | string
 ): Promise<PublicProfile[]> {
   const cityFilter = typeof options === "string" ? options : options?.cityFilter;
-  let maxDistanceKm = typeof options === "object" ? options?.maxDistanceKm : undefined;
+  const opts = typeof options === "object" ? options : {};
+  let maxDistanceKm = opts.maxDistanceKm;
 
   // Resolve user's distance preference if not explicitly provided
-  if (typeof maxDistanceKm !== "number") {
-    try {
-      const prefs = await fetchUserPreferences(currentUserId);
-      maxDistanceKm = prefs.max_distance_km;
-    } catch {
+  let userPrefs = null;
+  try {
+    userPrefs = await fetchUserPreferences(currentUserId);
+    if (typeof maxDistanceKm !== "number") {
+      maxDistanceKm = userPrefs.max_distance_km;
+    }
+  } catch {
+    if (typeof maxDistanceKm !== "number") {
       maxDistanceKm = 50;
     }
   }
 
+  const effectiveMinAge = opts.minAge ?? userPrefs?.min_age ?? 18;
+  const effectiveMaxAge = opts.maxAge ?? userPrefs?.max_age ?? 100;
+  const effectiveGenders = opts.genders ?? userPrefs?.preferred_genders;
+  const effectiveInterest = opts.interest?.trim().toLowerCase();
+  const effectiveIntention = opts.intention?.trim().toLowerCase();
+
+  const filterPayload = {
+    maxDistanceKm,
+    minAge: effectiveMinAge,
+    maxAge: effectiveMaxAge,
+    genders: effectiveGenders,
+    interest: effectiveInterest,
+    intention: effectiveIntention,
+  };
+
   const { isSupabaseConfigured } = getAppEnv();
 
   if (!isSupabaseConfigured) {
-    return devStore.getDiscoveryCandidates(currentUserId, maxDistanceKm);
+    return devStore.getDiscoveryCandidates(currentUserId, filterPayload);
   }
 
   const supabase = createClient();
@@ -41,7 +70,7 @@ export async function fetchDiscoveryCandidates(
   if (error) {
     console.error("Error calling get_discovery_candidates RPC:", error);
     // Graceful fallback to devStore so UI does not freeze
-    return devStore.getDiscoveryCandidates(currentUserId, maxDistanceKm);
+    return devStore.getDiscoveryCandidates(currentUserId, filterPayload);
   }
 
   // Fetch current user's location to compute accurate distances
@@ -89,7 +118,7 @@ export async function fetchDiscoveryCandidates(
   });
 
   const settings = await fetchPlatformSettings();
-  let pool = candidates.length > 0 ? candidates : devStore.getDiscoveryCandidates(currentUserId, maxDistanceKm);
+  let pool = candidates.length > 0 ? candidates : devStore.getDiscoveryCandidates(currentUserId, filterPayload);
 
   if (settings.require_photo_to_discover) {
     pool = pool.filter((c) => Boolean(c.primary_photo_url || (c.photos && c.photos.length > 0)));
@@ -103,6 +132,30 @@ export async function fetchDiscoveryCandidates(
       }
       return true;
     });
+  }
+
+  // Filter candidates by age range
+  pool = pool.filter((c) => c.age >= effectiveMinAge && c.age <= effectiveMaxAge);
+
+  // Filter candidates by gender
+  if (Array.isArray(effectiveGenders) && effectiveGenders.length > 0) {
+    pool = pool.filter((c) => effectiveGenders.includes(c.gender));
+  }
+
+  // Filter by shared interests
+  if (effectiveInterest) {
+    pool = pool.filter(
+      (c) => c.interests && c.interests.some((i) => i.toLowerCase().includes(effectiveInterest))
+    );
+  }
+
+  // Filter by dating intentions
+  if (effectiveIntention) {
+    pool = pool.filter(
+      (c) =>
+        c.dating_intentions &&
+        c.dating_intentions.some((d) => d.toLowerCase().includes(effectiveIntention))
+    );
   }
 
   // Sort by closest distance first
