@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand colors (Used for Splash Screen and UI elements) -->
+    <color name="colorPrimary">#FFFFFF</color>         <!-- White background for splash -->
+    <color name="colorPrimaryDark">#CCCCCC</color>
+    <color name="colorAccent">#000000</color>
+</resources>

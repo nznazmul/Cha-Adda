@@ -17,6 +17,11 @@
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <!-- The background color of the splash screen -->
+        <item name="windowSplashScreenBackground">@color/colorPrimary</item>
+        <!-- The animated/static icon in the center (required by Android 12 API) -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_round</item>
+        <!-- The theme to apply after the splash screen is dismissed -->
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>
