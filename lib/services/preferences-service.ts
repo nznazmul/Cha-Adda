@@ -38,16 +38,18 @@ function getLocalPrefs(userId: string): UserPreferences | null {
   return null;
 }
 
-function setLocalPrefs(userId: string, prefs: UserPreferences) {
+function setLocalPrefs(userId: string, prefs: UserPreferences, notify: boolean = false) {
   if (typeof window === "undefined" || !userId) return;
   try {
     localStorage.setItem(`${STORAGE_PREFIX}${userId}`, JSON.stringify(prefs));
-    // Dispatch custom browser event for instant cross-component synchronization
-    window.dispatchEvent(
-      new CustomEvent("cha_adda_preferences_changed", {
-        detail: prefs,
-      })
-    );
+    if (notify) {
+      // Dispatch custom browser event only when user explicitly saves preferences
+      window.dispatchEvent(
+        new CustomEvent("cha_adda_preferences_changed", {
+          detail: prefs,
+        })
+      );
+    }
   } catch {
     // Ignore storage quota
   }
@@ -66,7 +68,8 @@ export async function fetchUserPreferences(userId: string): Promise<UserPreferen
   if (!isSupabaseConfigured) {
     const devPrefs = devStore.getPreferences(userId);
     const merged = { ...DEFAULT_PREFERENCES, ...cached, ...devPrefs, user_id: userId };
-    setLocalPrefs(userId, merged);
+    // Cache quietly without firing re-render events
+    setLocalPrefs(userId, merged, false);
     return merged;
   }
 
@@ -88,7 +91,7 @@ export async function fetchUserPreferences(userId: string): Promise<UserPreferen
         location_enabled: data.location_enabled ?? DEFAULT_PREFERENCES.location_enabled,
         show_distance: cached?.show_distance ?? DEFAULT_PREFERENCES.show_distance,
       };
-      setLocalPrefs(userId, result);
+      setLocalPrefs(userId, result, false);
       return result;
     }
   } catch (err) {
@@ -112,8 +115,8 @@ export async function saveUserPreferences(
     user_id: userId,
   };
 
-  // 1. Immediately update localStorage & dispatch event
-  setLocalPrefs(userId, updated);
+  // 1. Immediately update localStorage & dispatch event across components
+  setLocalPrefs(userId, updated, true);
 
   // 2. Update devStore
   devStore.savePreferences(userId, updated);

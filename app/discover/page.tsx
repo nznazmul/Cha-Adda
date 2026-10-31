@@ -91,33 +91,37 @@ export default function DiscoverPage() {
       fetchUserPreferences(user.id).then((prefs) => {
         if (!isMounted) return;
         if (typeof prefs.max_distance_km === "number") {
-          setRadiusFilter(prefs.max_distance_km);
+          setRadiusFilter((prev) => (prev !== prefs.max_distance_km ? prefs.max_distance_km : prev));
         }
         if (typeof prefs.min_age === "number") {
-          setFilterMinAge(prefs.min_age);
+          setFilterMinAge((prev) => (prev !== prefs.min_age ? prefs.min_age : prev));
         }
         if (typeof prefs.max_age === "number") {
-          setFilterMaxAge(prefs.max_age);
+          setFilterMaxAge((prev) => (prev !== prefs.max_age ? prefs.max_age : prev));
         }
         if (Array.isArray(prefs.preferred_genders) && prefs.preferred_genders.length > 0) {
-          setFilterGenders(prefs.preferred_genders);
+          const newKey = prefs.preferred_genders.slice().sort().join(",");
+          setFilterGenders((prev) => (prev.slice().sort().join(",") === newKey ? prev : prefs.preferred_genders));
         }
       });
     }
 
     const handlePrefsChange = (e: Event) => {
       const custom = e as CustomEvent;
-      if (custom.detail?.max_distance_km) {
-        setRadiusFilter(custom.detail.max_distance_km);
+      if (!custom.detail) return;
+      const d = custom.detail;
+      if (typeof d.max_distance_km === "number") {
+        setRadiusFilter((prev) => (prev !== d.max_distance_km ? d.max_distance_km : prev));
       }
-      if (custom.detail?.min_age) {
-        setFilterMinAge(custom.detail.min_age);
+      if (typeof d.min_age === "number") {
+        setFilterMinAge((prev) => (prev !== d.min_age ? d.min_age : prev));
       }
-      if (custom.detail?.max_age) {
-        setFilterMaxAge(custom.detail.max_age);
+      if (typeof d.max_age === "number") {
+        setFilterMaxAge((prev) => (prev !== d.max_age ? d.max_age : prev));
       }
-      if (custom.detail?.preferred_genders) {
-        setFilterGenders(custom.detail.preferred_genders);
+      if (Array.isArray(d.preferred_genders) && d.preferred_genders.length > 0) {
+        const newKey = d.preferred_genders.slice().sort().join(",");
+        setFilterGenders((prev) => (prev.slice().sort().join(",") === newKey ? prev : d.preferred_genders));
       }
     };
     window.addEventListener("cha_adda_preferences_changed", handlePrefsChange);
@@ -128,9 +132,13 @@ export default function DiscoverPage() {
     };
   }, [user?.id]);
 
+  const gendersDependencyKey = filterGenders.slice().sort().join(",");
+
   useEffect(() => {
+    let isCancelled = false;
+
     async function loadCandidates() {
-      if (!user) return;
+      if (!user?.id) return;
       setLoading(true);
       try {
         const list = await fetchDiscoveryCandidates(user.id, {
@@ -141,18 +149,26 @@ export default function DiscoverPage() {
           interest: filterInterest || undefined,
           intention: filterIntention || undefined,
         });
-        setCandidates(list);
-        setCurrentIndex(0);
-        setActivePhotoIndex(0);
+        if (!isCancelled) {
+          setCandidates(list);
+          setCurrentIndex(0);
+          setActivePhotoIndex(0);
+        }
       } catch (err) {
         console.error("Error loading candidates:", err);
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     }
 
     loadCandidates();
-  }, [user, radiusFilter, filterMinAge, filterMaxAge, filterGenders, filterInterest, filterIntention]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user?.id, radiusFilter, filterMinAge, filterMaxAge, gendersDependencyKey, filterInterest, filterIntention]);
 
   const handleApplyFilters = async () => {
     setShowFilterModal(false);

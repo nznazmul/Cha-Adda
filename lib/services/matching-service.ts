@@ -29,14 +29,21 @@ export async function fetchDiscoveryCandidates(
 
   // Resolve user's distance preference if not explicitly provided
   let userPrefs = null;
-  try {
-    userPrefs = await fetchUserPreferences(currentUserId);
-    if (typeof maxDistanceKm !== "number") {
-      maxDistanceKm = userPrefs.max_distance_km;
-    }
-  } catch {
-    if (typeof maxDistanceKm !== "number") {
-      maxDistanceKm = 50;
+  if (
+    typeof maxDistanceKm !== "number" ||
+    typeof opts.minAge !== "number" ||
+    typeof opts.maxAge !== "number" ||
+    !opts.genders
+  ) {
+    try {
+      userPrefs = await fetchUserPreferences(currentUserId);
+      if (typeof maxDistanceKm !== "number") {
+        maxDistanceKm = userPrefs.max_distance_km;
+      }
+    } catch {
+      if (typeof maxDistanceKm !== "number") {
+        maxDistanceKm = 50;
+      }
     }
   }
 
