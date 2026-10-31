@@ -46,6 +46,7 @@ export function SelfieCameraModal({
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => {
         try {
+          track.enabled = false;
           track.stop();
         } catch (err) {
           console.warn("Track stop error:", err);
@@ -54,7 +55,12 @@ export function SelfieCameraModal({
       streamRef.current = null;
     }
     if (videoRef.current) {
-      videoRef.current.srcObject = null;
+      try {
+        videoRef.current.pause();
+        videoRef.current.srcObject = null;
+      } catch (err) {
+        console.warn("Video cleanup error:", err);
+      }
     }
     setIsStreaming(false);
     setIsVideoPaused(false);
@@ -167,12 +173,17 @@ export function SelfieCameraModal({
     }
   }, [stopCamera]);
 
-  // Main lifecycle: starts camera on open/mount, cleans up hardware tracks on close/unmount
+  // Main lifecycle: starts camera only when modal is open, cleans up hardware tracks on close/unmount
   useEffect(() => {
+    if (!isOpen) {
+      stopCamera();
+      return;
+    }
+
     let isCancelled = false;
 
     Promise.resolve().then(() => {
-      if (!isCancelled) {
+      if (!isCancelled && isOpen) {
         startCamera();
       }
     });
@@ -181,7 +192,29 @@ export function SelfieCameraModal({
       isCancelled = true;
       stopCamera();
     };
-  }, [startCamera, stopCamera]);
+  }, [isOpen, startCamera, stopCamera]);
+
+  // Ensure camera hardware is immediately freed if tab/phone is minimized or closed
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        stopCamera();
+      }
+    };
+
+    window.addEventListener("pagehide", stopCamera);
+    window.addEventListener("beforeunload", stopCamera);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pagehide", stopCamera);
+      window.removeEventListener("beforeunload", stopCamera);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      stopCamera();
+    };
+  }, [isOpen, stopCamera]);
 
   if (!isOpen) return null;
 
@@ -255,6 +288,7 @@ export function SelfieCameraModal({
     try {
       const ok = await onSubmitSelfie(capturedPhoto);
       if (ok) {
+        stopCamera();
         setSubmittedSuccess(true);
         try {
           confetti({

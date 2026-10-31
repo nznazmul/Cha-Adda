@@ -2,6 +2,7 @@ import { Profile, PublicProfile, ProfilePhoto, Swipe, Match, Message, Report, No
 import { bengaliFemaleProfiles, bengaliFemalePhotos } from "@/lib/data/bengali-bots";
 import { getMemberId, isMatchingMemberId } from "@/lib/utils/member-id";
 import { calculateVerificationExpiry, VerificationDurationPreset } from "@/lib/utils/verification";
+import { calculateDistanceBetween } from "@/lib/services/geo-service";
 
 // Seed development profiles
 const initialProfiles: Profile[] = [
@@ -330,6 +331,7 @@ class DevDataStore {
   private verificationRequests: VerificationRequest[] = [];
   private meetingSpots: MeetingSpot[] = [];
   private currentUserId: string = "usr-aria-01"; // Default dev actor
+  private userPreferences: Map<string, any> = new Map();
   private platformSettings: PlatformSettings = {
     min_age: 18,
     max_photos: 6,
@@ -437,7 +439,26 @@ class DevDataStore {
     this.photos.set(userId, [...photos]);
   }
 
-  toPublicProfile(profile: Profile): PublicProfile {
+  getPreferences(userId: string): any {
+    return this.userPreferences.get(userId) || {
+      user_id: userId,
+      min_age: 18,
+      max_age: 100,
+      preferred_genders: ["woman", "man", "nonbinary"],
+      max_distance_km: 50,
+      location_enabled: true,
+      show_distance: true,
+    };
+  }
+
+  savePreferences(userId: string, prefs: any) {
+    const current = this.getPreferences(userId);
+    const updated = { ...current, ...prefs, user_id: userId };
+    this.userPreferences.set(userId, updated);
+    return updated;
+  }
+
+  toPublicProfile(profile: Profile, viewerId?: string): PublicProfile {
     const birthDate = new Date(profile.date_of_birth);
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
@@ -449,6 +470,11 @@ class DevDataStore {
     const userPhotos = this.getPhotos(profile.id);
     const primary = userPhotos.find((p) => p.is_primary) || userPhotos[0];
 
+    const currentViewer = viewerId ? this.getProfile(viewerId) : this.getProfile(this.currentUserId);
+    const distanceKm = currentViewer
+      ? calculateDistanceBetween(currentViewer, profile)
+      : calculateDistanceBetween({ city: "Dhaka" }, profile);
+
     return {
       id: profile.id,
       unique_id: getMemberId(profile),
@@ -458,7 +484,7 @@ class DevDataStore {
       orientation: profile.orientation,
       bio: profile.bio,
       city: profile.city,
-      approx_distance_km: 3,
+      approx_distance_km: distanceKm,
       job_title: profile.job_title,
       education: profile.education,
       height_cm: profile.height_cm,
@@ -477,7 +503,7 @@ class DevDataStore {
     };
   }
 
-  getDiscoveryCandidates(currentUserId: string): PublicProfile[] {
+  getDiscoveryCandidates(currentUserId: string, maxDistanceKm?: number): PublicProfile[] {
     // Exclude swiped profiles, blocked profiles, self, and undiscoverable profiles
     const swipedTargetIds = new Set(
       this.swipes
@@ -493,6 +519,9 @@ class DevDataStore {
         .map((b) => (b.blocker_id === currentUserId ? b.blocked_id : b.blocker_id))
     );
 
+    const userPrefs = this.getPreferences(currentUserId);
+    const effectiveLimit = typeof maxDistanceKm === "number" ? maxDistanceKm : (userPrefs?.max_distance_km ?? 50);
+
     const candidates: PublicProfile[] = [];
     for (const [id, p] of this.profiles.entries()) {
       if (
@@ -503,9 +532,20 @@ class DevDataStore {
         p.profile_complete &&
         p.account_status === "active"
       ) {
-        candidates.push(this.toPublicProfile(p));
+        const pub = this.toPublicProfile(p, currentUserId);
+        // Distance filter: If effectiveLimit < 300 (not "All Bangladesh"), filter by distance!
+        if (effectiveLimit < 300) {
+          if (typeof pub.approx_distance_km === "number" && pub.approx_distance_km > effectiveLimit) {
+            continue;
+          }
+        }
+        candidates.push(pub);
       }
     }
+
+    // Sort by proximity: closest members first!
+    candidates.sort((a, b) => (a.approx_distance_km ?? 999) - (b.approx_distance_km ?? 999));
+
     return candidates;
   }
 

@@ -475,12 +475,14 @@ export default function ProfilePage() {
         </Link>
       </div>
 
-      {/* Live Camera Selfie Verification Modal */}
-      <SelfieCameraModal
-        isOpen={showVerificationModal}
-        onClose={() => setShowVerificationModal(false)}
-        onSubmitSelfie={handleSelfieSubmit}
-      />
+      {/* Live Camera Selfie Verification Modal: Only mounted when user explicitly clicks to verify and is unverified */}
+      {showVerificationModal && !hasBlueTick && verificationRequest?.status !== "pending" && (
+        <SelfieCameraModal
+          isOpen={showVerificationModal}
+          onClose={() => setShowVerificationModal(false)}
+          onSubmitSelfie={handleSelfieSubmit}
+        />
+      )}
 
       {/* Live Public Card Preview Modal */}
       {showPreviewModal && (

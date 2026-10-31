@@ -21,7 +21,8 @@ import {
   Coffee,
   Send,
   Check,
-  User
+  User,
+  Compass
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-context";
 import { fetchDiscoveryCandidates, submitSwipe, searchMembers } from "@/lib/services/matching-service";
@@ -29,6 +30,8 @@ import { PublicProfile } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { getMemberId } from "@/lib/utils/member-id";
 import { BlueTickBadge } from "@/components/ui/blue-tick-badge";
+import { formatDistanceBengali } from "@/lib/services/geo-service";
+import { fetchUserPreferences, saveUserPreferences } from "@/lib/services/preferences-service";
 
 const POPULAR_VENUES = [
   "☕ ধানমন্ডি রবীন্দ্র সরোবর",
@@ -60,6 +63,10 @@ export default function DiscoverPage() {
   const [customTeaNote, setCustomTeaNote] = useState("এক কাপ ধোঁয়া ওঠা চা আর চমৎকার আড্ডার দাওয়াত রইল!");
   const [inviteSending, setInviteSending] = useState(false);
 
+  // Distance Radius Filter State
+  const [radiusFilter, setRadiusFilter] = useState<number>(50);
+  const [showRadiusModal, setShowRadiusModal] = useState<boolean>(false);
+
   // Search State for Member ID / Name Search
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<PublicProfile[]>([]);
@@ -72,14 +79,42 @@ export default function DiscoverPage() {
   const likeOpacity = useTransform(x, [10, 100], [0, 1]);
   const nopeOpacity = useTransform(x, [-10, -100], [0, 1]);
 
+  // Load user's saved distance preferences and listen for updates
+  useEffect(() => {
+    let isMounted = true;
+    if (user?.id) {
+      fetchUserPreferences(user.id).then((prefs) => {
+        if (isMounted && typeof prefs.max_distance_km === "number") {
+          setRadiusFilter(prefs.max_distance_km);
+        }
+      });
+    }
+
+    const handlePrefsChange = (e: Event) => {
+      const custom = e as CustomEvent;
+      if (custom.detail?.max_distance_km) {
+        setRadiusFilter(custom.detail.max_distance_km);
+      }
+    };
+    window.addEventListener("cha_adda_preferences_changed", handlePrefsChange);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("cha_adda_preferences_changed", handlePrefsChange);
+    };
+  }, [user?.id]);
+
   useEffect(() => {
     async function loadCandidates() {
       if (!user) return;
       setLoading(true);
       try {
-        const list = await fetchDiscoveryCandidates(user.id);
+        const list = await fetchDiscoveryCandidates(user.id, {
+          maxDistanceKm: radiusFilter,
+        });
         setCandidates(list);
         setCurrentIndex(0);
+        setActivePhotoIndex(0);
       } catch (err) {
         console.error("Error loading candidates:", err);
       } finally {
@@ -88,7 +123,15 @@ export default function DiscoverPage() {
     }
 
     loadCandidates();
-  }, [user]);
+  }, [user, radiusFilter]);
+
+  const handleUpdateRadius = async (newKm: number) => {
+    setRadiusFilter(newKm);
+    setShowRadiusModal(false);
+    if (user?.id) {
+      await saveUserPreferences(user.id, { max_distance_km: newKm });
+    }
+  };
 
   // Search Debounced Effect
   useEffect(() => {
@@ -278,15 +321,15 @@ export default function DiscoverPage() {
       {/* Top Ambient Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-rose-600/10 blur-[140px] pointer-events-none rounded-full" />
 
-      {/* Top Search Bar for Member ID / Name Search */}
-      <div className="w-full max-w-sm mb-3 sm:mb-4 relative z-30">
-        <div className="relative flex items-center">
+      {/* Top Search Bar & Quick Distance Radius Trigger */}
+      <div className="w-full max-w-sm mb-3 sm:mb-4 relative z-30 flex items-center gap-2">
+        <div className="relative flex items-center flex-1">
           <Search className="absolute left-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search Member ID (e.g. CHA-...) or Name..."
+            placeholder="Search Member ID or Name..."
             className="w-full rounded-2xl border border-border/80 bg-card/90 py-2.5 pl-10 pr-9 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground/60 shadow-lg backdrop-blur-md focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
           />
           {searchQuery && (
@@ -298,6 +341,17 @@ export default function DiscoverPage() {
             </button>
           )}
         </div>
+
+        {/* Quick Distance Filter Trigger */}
+        <button
+          type="button"
+          onClick={() => setShowRadiusModal(true)}
+          title="দূরত্ব ফিল্টার পরিবর্তন করুন"
+          className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl border border-rose-500/40 bg-card/90 hover:bg-rose-500/10 text-rose-500 text-xs font-bold shadow-lg backdrop-blur-md transition-all active:scale-95 shrink-0"
+        >
+          <Compass className="h-4 w-4" />
+          <span>{radiusFilter >= 300 ? "সারাদেশ" : `${radiusFilter}km`}</span>
+        </button>
       </div>
 
       {isSearching ? (
@@ -357,7 +411,7 @@ export default function DiscoverPage() {
                         </span>
                       </div>
                       <span className="text-[11px] text-muted-foreground truncate">
-                        {member.city} {member.job_title ? `• ${member.job_title}` : ""}
+                        {member.city} {typeof member.approx_distance_km === "number" ? `• ${formatDistanceBengali(member.approx_distance_km)}` : ""} {member.job_title ? `• ${member.job_title}` : ""}
                       </span>
                     </div>
                   </div>
@@ -389,37 +443,65 @@ export default function DiscoverPage() {
         </div>
       ) : currentIndex >= candidates.length || !currentCandidate ? (
         /* Empty State */
-        <div className="flex flex-col items-center justify-center text-center max-w-sm p-8 rounded-3xl border border-border/80 bg-card shadow-xl backdrop-blur-md">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-secondary text-primary mb-4">
-            <Sparkles className="h-8 w-8" />
+        <div className="flex flex-col items-center justify-center text-center max-w-sm p-7 rounded-3xl border border-border/80 bg-card shadow-xl backdrop-blur-md">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/15 text-rose-500 mb-3">
+            <Compass className="h-7 w-7" />
           </div>
-          <h2 className="text-xl font-bold tracking-tight">You&apos;ve seen everyone nearby!</h2>
-          <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-            There are no new candidates matching your current filters. Check back soon or broaden your discovery preferences.
+          <h2 className="text-lg font-black tracking-tight">নতুন কোনো মেম্বার পাওয়া যায়নি</h2>
+          <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+            আপনার নির্ধারিত <strong className="text-foreground">{radiusFilter >= 300 ? "সারাদেশের" : `${radiusFilter} কিলোমিটার`}</strong> দূরত্বের মধ্যে নতুন আর কেউ বাকি নেই। দূরত্ব ফিল্টার বাড়িয়ে আরও মানুষ খুঁজে নিতে পারেন।
           </p>
-          <div className="mt-6 flex flex-col gap-2.5 w-full">
+          <div className="mt-5 flex flex-col gap-2 w-full">
+            {radiusFilter < 50 && (
+              <button
+                type="button"
+                onClick={() => handleUpdateRadius(50)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold shadow-md shadow-rose-500/25 transition-all"
+              >
+                <span>দূরত্ব বাড়িয়ে ৫০ কিমি করুন 📍</span>
+              </button>
+            )}
+            {radiusFilter < 100 && (
+              <button
+                type="button"
+                onClick={() => handleUpdateRadius(100)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-bold transition-all"
+              >
+                <span>দূরত্ব বাড়িয়ে ১০০ কিমি করুন 🚗</span>
+              </button>
+            )}
+            {radiusFilter < 300 && (
+              <button
+                type="button"
+                onClick={() => handleUpdateRadius(300)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary text-white text-xs font-bold shadow-md shadow-primary/25 hover:opacity-95 transition-all"
+              >
+                <Sparkles className="h-4 w-4" />
+                <span>পুরো বাংলাদেশ দেখুন (All Bangladesh)</span>
+              </button>
+            )}
             <button
               onClick={async () => {
                 if (user) {
                   setLoading(true);
-                  const list = await fetchDiscoveryCandidates(user.id);
+                  const list = await fetchDiscoveryCandidates(user.id, { maxDistanceKm: radiusFilter });
                   setCandidates(list);
                   setCurrentIndex(0);
                   setActivePhotoIndex(0);
                   setLoading(false);
                 }
               }}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary text-white text-xs font-bold shadow-md shadow-primary/25 hover:opacity-95 transition-all"
+              className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl border border-border bg-secondary/60 text-xs font-semibold hover:bg-secondary transition-colors"
             >
-              <RotateCcw className="h-4 w-4" />
-              <span>Refresh Feed</span>
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>ফীড পুনরায় রিফ্রেশ করুন</span>
             </button>
             <Link
               href="/settings"
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-border bg-secondary/50 text-xs font-semibold hover:bg-secondary transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl border border-border bg-secondary/30 text-xs font-semibold hover:bg-secondary transition-colors"
             >
-              <SlidersHorizontal className="h-4 w-4" />
-              <span>Adjust Discovery Filters</span>
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              <span>সেটিংস থেকে ফিল্টার কনফিগার করুন</span>
             </Link>
           </div>
         </div>
@@ -509,14 +591,19 @@ export default function DiscoverPage() {
                 </span>
               </div>
 
-              <div className="flex items-center gap-3 text-xs text-rose-200 mt-1 font-medium">
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5" />
+              <div className="flex items-center gap-2 text-xs text-rose-200 mt-1 font-medium flex-wrap">
+                <span className="flex items-center gap-1 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10">
+                  <MapPin className="h-3 w-3 text-rose-400" />
                   <span>{currentCandidate.city}</span>
+                  {typeof currentCandidate.approx_distance_km === "number" && (
+                    <span className="text-white font-bold ml-0.5">
+                      • {formatDistanceBengali(currentCandidate.approx_distance_km)}
+                    </span>
+                  )}
                 </span>
                 {currentCandidate.job_title && (
-                  <span className="flex items-center gap-1 truncate">
-                    <Briefcase className="h-3.5 w-3.5" />
+                  <span className="flex items-center gap-1 truncate bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10">
+                    <Briefcase className="h-3 w-3" />
                     <span>{currentCandidate.job_title}</span>
                   </span>
                 )}
@@ -634,8 +721,15 @@ export default function DiscoverPage() {
                       ID: {getMemberId(inspectProfile)}
                     </span>
                   </div>
-                  <p className="text-xs text-rose-200 mt-1">
-                    {inspectProfile.city} {inspectProfile.job_title ? `• ${inspectProfile.job_title}` : ""}
+                  <p className="text-xs text-rose-200 mt-1 flex items-center gap-1.5 flex-wrap">
+                    <MapPin className="h-3.5 w-3.5 text-rose-400" />
+                    <span>{inspectProfile.city}</span>
+                    {typeof inspectProfile.approx_distance_km === "number" && (
+                      <span className="bg-rose-500/30 border border-rose-500/40 px-2 py-0.5 rounded-full text-[10px] text-white font-bold">
+                        {formatDistanceBengali(inspectProfile.approx_distance_km)}
+                      </span>
+                    )}
+                    {inspectProfile.job_title ? `• ${inspectProfile.job_title}` : ""}
                   </p>
                 </div>
               </div>
@@ -933,6 +1027,100 @@ export default function DiscoverPage() {
                 className="w-full py-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
               >
                 Keep Swiping
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Distance Radius Filter Modal */}
+      {showRadiusModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-sm rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-border/80 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-500/15 text-rose-500">
+                  <Compass className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">দূরত্ব ফিল্টার (Distance Radius)</h3>
+                  <p className="text-[10px] text-muted-foreground">আপনার চারপাশের কত দূরত্বের মানুষ দেখবেন?</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRadiusModal(false)}
+                className="p-1 rounded-full text-muted-foreground hover:bg-secondary transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">নির্বাচিত সর্বোচ্চ দূরত্ব:</span>
+                <span className="font-bold text-rose-500 font-mono">
+                  {radiusFilter >= 300 ? "পুরো বাংলাদেশ (All)" : `${radiusFilter} কিমি`}
+                </span>
+              </div>
+
+              <input
+                type="range"
+                min={5}
+                max={300}
+                step={5}
+                value={radiusFilter}
+                onChange={(e) => setRadiusFilter(Number(e.target.value))}
+                className="w-full h-2.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-rose-500"
+              />
+
+              <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+                <span>৫ কিমি</span>
+                <span>৫০ কিমি</span>
+                <span>১০০ কিমি</span>
+                <span>৩০০+ কিমি (সারাদেশ)</span>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="grid grid-cols-3 gap-1.5 pt-1">
+                {[
+                  { label: "১০ কিমি", val: 10 },
+                  { label: "২৫ কিমি", val: 25 },
+                  { label: "৫০ কিমি", val: 50 },
+                  { label: "১০০ কিমি", val: 100 },
+                  { label: "১৫০ কিমি", val: 150 },
+                  { label: "সারাদেশ", val: 300 },
+                ].map((p) => (
+                  <button
+                    key={p.val}
+                    type="button"
+                    onClick={() => setRadiusFilter(p.val)}
+                    className={`py-2 px-2 rounded-xl text-xs font-semibold border transition-all text-center ${
+                      radiusFilter === p.val
+                        ? "border-rose-500 bg-rose-500/10 text-rose-500 shadow-sm font-bold"
+                        : "border-border bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between gap-2 border-t border-border/80">
+              <Link
+                href="/settings"
+                onClick={() => setShowRadiusModal(false)}
+                className="text-xs text-muted-foreground hover:text-foreground underline flex items-center gap-1"
+              >
+                <span>আরও সেটিংস</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => handleUpdateRadius(radiusFilter)}
+                className="py-2.5 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold shadow-md shadow-rose-500/25 transition-all"
+              >
+                ফিল্টার প্রয়োগ করুন 🎯
               </button>
             </div>
           </div>

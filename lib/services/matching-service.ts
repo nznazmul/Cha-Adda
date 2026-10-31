@@ -6,53 +6,107 @@ import { PublicProfile, Match, SwipeAction, Profile, ProfilePhoto } from "@/type
 import { getMemberId, isMatchingMemberId } from "@/lib/utils/member-id";
 import { calculateAge } from "@/lib/utils";
 import { decryptMessage } from "@/lib/security/e2ee";
+import { calculateDistanceBetween } from "@/lib/services/geo-service";
+import { fetchUserPreferences } from "@/lib/services/preferences-service";
 
 export async function fetchDiscoveryCandidates(
   currentUserId: string,
-  cityFilter?: string
+  options?: { cityFilter?: string; maxDistanceKm?: number } | string
 ): Promise<PublicProfile[]> {
+  const cityFilter = typeof options === "string" ? options : options?.cityFilter;
+  let maxDistanceKm = typeof options === "object" ? options?.maxDistanceKm : undefined;
+
+  // Resolve user's distance preference if not explicitly provided
+  if (typeof maxDistanceKm !== "number") {
+    try {
+      const prefs = await fetchUserPreferences(currentUserId);
+      maxDistanceKm = prefs.max_distance_km;
+    } catch {
+      maxDistanceKm = 50;
+    }
+  }
+
   const { isSupabaseConfigured } = getAppEnv();
 
   if (!isSupabaseConfigured) {
-    return devStore.getDiscoveryCandidates(currentUserId);
+    return devStore.getDiscoveryCandidates(currentUserId, maxDistanceKm);
   }
 
   const supabase = createClient();
   const { data, error } = await supabase.rpc("get_discovery_candidates", {
-    p_limit: 25,
+    p_limit: 50,
     p_city_filter: cityFilter || null,
   });
 
   if (error) {
     console.error("Error calling get_discovery_candidates RPC:", error);
     // Graceful fallback to devStore so UI does not freeze
-    return devStore.getDiscoveryCandidates(currentUserId);
+    return devStore.getDiscoveryCandidates(currentUserId, maxDistanceKm);
   }
 
-  const candidates = ((data as PublicProfile[]) || []).map((row) => ({
-    id: row.id,
-    display_name: row.display_name,
-    age: row.age,
-    gender: row.gender,
-    orientation: row.orientation,
-    bio: row.bio,
-    city: row.city,
-    job_title: row.job_title,
-    education: row.education,
-    height_cm: row.height_cm,
-    dating_intentions: row.dating_intentions || [],
-    interests: row.interests || [],
-    languages: row.languages || [],
-    photos: row.photos || [],
-    primary_photo_url: row.photos?.[0]?.url,
-  }));
+  // Fetch current user's location to compute accurate distances
+  let currentUserLocation: { id?: string; city?: string | null; latitude?: number | null; longitude?: number | null } = {
+    id: currentUserId,
+    city: "Dhaka",
+  };
+  try {
+    const { data: currentProfile } = await supabase
+      .from("profiles")
+      .select("id, city, latitude, longitude")
+      .eq("id", currentUserId)
+      .maybeSingle();
+    if (currentProfile) {
+      currentUserLocation = currentProfile;
+    }
+  } catch (err) {
+    console.warn("Could not load current user location for distance:", err);
+  }
+
+  const candidates = ((data as PublicProfile[]) || []).map((row) => {
+    const dist = calculateDistanceBetween(currentUserLocation, {
+      id: row.id,
+      city: row.city,
+    });
+
+    return {
+      id: row.id,
+      display_name: row.display_name,
+      age: row.age,
+      gender: row.gender,
+      orientation: row.orientation,
+      bio: row.bio,
+      city: row.city,
+      approx_distance_km: dist,
+      job_title: row.job_title,
+      education: row.education,
+      height_cm: row.height_cm,
+      dating_intentions: row.dating_intentions || [],
+      interests: row.interests || [],
+      languages: row.languages || [],
+      photos: row.photos || [],
+      primary_photo_url: row.photos?.[0]?.url,
+    };
+  });
 
   const settings = await fetchPlatformSettings();
-  let pool = candidates.length > 0 ? candidates : devStore.getDiscoveryCandidates(currentUserId);
+  let pool = candidates.length > 0 ? candidates : devStore.getDiscoveryCandidates(currentUserId, maxDistanceKm);
 
   if (settings.require_photo_to_discover) {
     pool = pool.filter((c) => Boolean(c.primary_photo_url || (c.photos && c.photos.length > 0)));
   }
+
+  // Filter candidates by maximum distance radius if radius < 300 (not "whole country")
+  if (typeof maxDistanceKm === "number" && maxDistanceKm < 300) {
+    pool = pool.filter((c) => {
+      if (typeof c.approx_distance_km === "number") {
+        return c.approx_distance_km <= maxDistanceKm;
+      }
+      return true;
+    });
+  }
+
+  // Sort by closest distance first
+  pool.sort((a, b) => (a.approx_distance_km ?? 999) - (b.approx_distance_km ?? 999));
 
   return pool;
 }
